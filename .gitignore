@@ -154,4 +154,4 @@ cython_debug/
 attention_saliency/SimSun.ttf
 attention_saliency/tests_mllms/
 .vscode/
-attention_saliency/VLM-Visualizer-example/
+
