@@ -151,3 +151,6 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+attention_saliency/SimSun.ttf
+attention_saliency/delete.py
+attention_saliency/detele_qwen.py
