@@ -5,13 +5,9 @@ import pandas as pd
 import os
 import shutil
 #pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
 import glob
 
-users_list = ['tomas']
-'''
-'sebastian','mohammed','alessio','antonella','lorenzo_ciocca','mireia','lorenzo_f','noemi','ralitsa',
-'''
+users_list = ['tomas','sebastian','mohammed','alessio','antonella','lorenzo_ciocca','mireia','lorenzo_f','noemi','ralitsa']
 sessions_list = [1]
 for user in users_list:
     for session in sessions_list:
@@ -25,12 +21,12 @@ for user in users_list:
         )
         fixations, words_fix, info = etdi.asign_fixations_process_words_all()
         etdi.save_fixations(words_fix, fixations_all=fixations, info=info)
+        features = pd.DataFrame(etdi.compute_entropy_all())
+        etdi.save_features(features)
         print(f"finished for {user} in session {session}")
 
 
-
-
-
-
-features = pd.DataFrame(etdi.compute_entropy_all())
-etdi.save_features(features)
+etdi.aggregate_word_fixprop_across_users(
+    users_list=users_list,
+    sessions_list=sessions_list
+)
