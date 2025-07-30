@@ -19,12 +19,9 @@ class ModelLoaderVisionSeq:
 
 
 
-
-
-
 class ModelLoaderFactory:
     def get_model_loader(self, loader_type):
-        if loader_type == "causalLM":
+        if loader_type == "VisionSeq":
             return ModelLoaderVisionSeq()
         else:
             raise ValueError(f"Unknown model loader type: {loader_type}")

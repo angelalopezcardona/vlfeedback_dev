@@ -18,7 +18,7 @@ if __name__ == "__main__":
 
     models = {
         # -----------------------------------------------
-        "llava-hf/llava-1.5-7b-hf": "BertBased",
+        "llava-hf/llava-1.5-7b-hf": "VisionSeq",
     }
 
     users_set = range(1, 9)
@@ -41,14 +41,11 @@ if __name__ == "__main__":
             test_prompts = HumanAttentionExtractor.load_trial_prompts()
             att_extractor = ModelAttentionExtractor(model_name, model_type)
             word_level = True
-            if reward is False:
-                attention_trials = att_extractor.extract_attention(
-                    texts_trials, word_level=word_level
-                )
-            else:
-                attention_trials = att_extractor.extract_attention_reward(
-                    texts_trials, texts_promps=test_prompts
-                )
+
+            attention_trials = att_extractor.extract_attention(
+                texts_trials, word_level=word_level
+            )
+           
             if word_level:
                 att_extractor.save_attention_df(
                     attention_trials,
