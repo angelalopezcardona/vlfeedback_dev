@@ -87,14 +87,19 @@ class ModelAttentionExtractor:
     @staticmethod
     def get_attention_model(model, inputs):
         # check if model has atribute device
-        if not hasattr(model, "device"):
-            input_ids = inputs["input_ids"]
-            attention_mask = inputs["attention_mask"]
-        else:
-            input_ids = inputs["input_ids"].to(model.device)
-            attention_mask = inputs["attention_mask"].to(model.device)
-        output = model(input_ids=input_ids, attention_mask=attention_mask)
-        return output.attentions
+        if  hasattr(model, "device"):
+            inputs.to(model.device)
+
+                # Generate with attention outputs
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs, 
+                max_new_tokens=100, 
+                output_attentions=True,
+                return_dict_in_generate=True
+            )
+
+        return outputs.attentionsx
 
     # For the attention baseline, we fixed several experimental choices (see below) which might affect the results.
 
@@ -178,12 +183,14 @@ class ModelAttentionExtractor:
             list_word_original = [str(x) for x in list_text]
             text = " ".join(list_word_original)
             list_word_original = [x.lower() for x in list_word_original]
-            input_ids = self.process_prompt(self.processor, text, image)
-            attention = self.get_attention_model(self.model, input_ids)
+            #TODO NEED TO READ THE IMAGE PATH HERE SOMEWHERE
+            inputs = self.process_prompt(self.processor, text, image_path)
+            attention = self.get_attention_model(self.model, inputs)
             try:
+                #need to change this for the new prerocess
                 attention_trials[trial] = self.process_attention(
                     attention,
-                    input_ids,
+                    inputs,
                     text=text,
                     list_word_original=list_word_original,
                     word_level=word_level,
@@ -223,21 +230,14 @@ class ModelAttentionExtractor:
         return special_token_idx
 
     @staticmethod
-    def process_prompt(processor, text, image):
+    def process_prompt(processor, text, image_path):
         
-model_names =[
-            #   "llava-hf/llava-1.5-7b-hf", 
-              "meta-llama/Llama-3.2-11B-Vision-Instruct", 
-            #   "google/paligemma-3b-mix-224"
-            ]
-trial_name = '5_baseline.jpg'
-image = Image.open('data' +   "/" + trial_name)
 
         messages = [
             {
                 "role": "user",
                 "content": [
-                    {"type": "image", "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/p-blog/candy.JPG"},
+                    {"type": "image", "image": image_path},
                     {"type": "text", "text": text}
                 ]
             },

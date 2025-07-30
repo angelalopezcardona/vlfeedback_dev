@@ -5,7 +5,7 @@ from eyetrackpy.data_processor.models.eye_tracking_data_simple import (
 )
 import os
 
-
+#adapt all this to the new files directorys
 class HumanAttentionExtractor:
     def load_gaze_features(self, folder):
         datauserset = EyeTrackingDataUserSet()

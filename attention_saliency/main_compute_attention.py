@@ -21,9 +21,9 @@ if __name__ == "__main__":
         "llava-hf/llava-1.5-7b-hf": "VisionSeq",
     }
 
-    users_set = range(1, 9)
+    users = range(1, 9)
     for model_name, model_type in models.items():
-        for user_set in users_set:
+        for user_set in users:
             # Load the model
             model_name.replace("/", "_")
 
