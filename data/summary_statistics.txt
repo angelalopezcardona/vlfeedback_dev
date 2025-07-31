@@ -1,0 +1,151 @@
+=== SUMMARY STATISTICS ===
+Total trials: 299
+Participants: 10
+Preferred responses: 150
+Rejected responses: 149
+
+Metrics Summary:
+FFD: mean=0.14, std=0.05, n=299
+TRT: mean=0.23, std=0.19, n=299
+nFIX: mean=1.06, std=0.66, n=299
+GPT: mean=0.41, std=0.25, n=299
+
+=== PAIRED T-TEST RESULTS ===
+Comparison: Preferred vs Rejected Responses (Paired Analysis)
+
+--- FFD ---
+Paired observations (n=149)
+Preferred: mean=0.13, std=0.05
+Rejected: mean=0.14, std=0.05
+Mean difference (Preferred - Rejected): -0.005
+Paired t-test: t=-1.043, p=0.2988
+Cohen's d: -0.085 (negligible effect)
+Significant: No
+
+--- TRT ---
+Paired observations (n=149)
+Preferred: mean=0.23, std=0.18
+Rejected: mean=0.24, std=0.20
+Mean difference (Preferred - Rejected): -0.012
+Paired t-test: t=-0.554, p=0.5805
+Cohen's d: -0.045 (negligible effect)
+Significant: No
+
+--- nFIX ---
+Paired observations (n=149)
+Preferred: mean=1.04, std=0.68
+Rejected: mean=1.08, std=0.65
+Mean difference (Preferred - Rejected): -0.035
+Paired t-test: t=-0.476, p=0.6346
+Cohen's d: -0.039 (negligible effect)
+Significant: No
+
+--- GPT ---
+Paired observations (n=149)
+Preferred: mean=0.41, std=0.24
+Rejected: mean=0.42, std=0.26
+Mean difference (Preferred - Rejected): -0.015
+Paired t-test: t=-0.526, p=0.6000
+Cohen's d: -0.043 (negligible effect)
+Significant: No
+
+
+=== WILCOXON SIGNED-RANK TEST RESULTS ===
+Non-parametric alternative to paired t-test
+
+--- FFD ---
+Paired observations (n=149)
+Mean difference: -0.005
+Wilcoxon W statistic: 4678.000
+P-value: 0.0848
+Significant: No
+
+--- TRT ---
+Paired observations (n=149)
+Mean difference: -0.012
+Wilcoxon W statistic: 4743.000
+P-value: 0.1095
+Significant: No
+
+--- nFIX ---
+Paired observations (n=149)
+Mean difference: -0.035
+Wilcoxon W statistic: 4847.000
+P-value: 0.1605
+Significant: No
+
+--- GPT ---
+Paired observations (n=149)
+Mean difference: -0.015
+Wilcoxon W statistic: 4989.000
+P-value: 0.2567
+Significant: No
+
+
+=== SIGN TEST RESULTS ===
+Tests if preferred responses consistently show better values
+
+--- FFD ---
+Total trials: 149
+Preferred better in: 82 trials
+Proportion: 55.0%
+P-value: 0.1257
+Significant: No
+
+--- TRT ---
+Total trials: 149
+Preferred better in: 84 trials
+Proportion: 56.4%
+P-value: 0.0700
+Significant: No
+
+--- nFIX ---
+Total trials: 149
+Preferred better in: 81 trials
+Proportion: 54.4%
+P-value: 0.1628
+Significant: No
+
+--- GPT ---
+Total trials: 149
+Preferred better in: 84 trials
+Proportion: 56.4%
+P-value: 0.0700
+Significant: No
+
+
+=== CORRELATION RESULTS ===
+Correlation between number of words and reading metrics
+
+--- FFD ---
+Sample size: 299
+Pearson correlation: r=-0.168, p=0.0036
+Spearman correlation: rho=-0.139, p=0.0160
+
+--- TRT ---
+Sample size: 299
+Pearson correlation: r=-0.277, p=0.0000
+Spearman correlation: rho=-0.275, p=0.0000
+
+--- nFIX ---
+Sample size: 299
+Pearson correlation: r=-0.288, p=0.0000
+Spearman correlation: rho=-0.250, p=0.0000
+
+--- GPT ---
+Sample size: 299
+Pearson correlation: r=-0.299, p=0.0000
+Spearman correlation: rho=-0.306, p=0.0000
+
+
+Participants processed (10):
+- 10 10
+- 1 1
+- 2 2
+- 3 3
+- 4 4
+- 5 5
+- 6 6
+- 7 7
+- 8 8
+- 9 9
