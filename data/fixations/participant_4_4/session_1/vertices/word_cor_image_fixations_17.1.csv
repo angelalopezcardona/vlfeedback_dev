@@ -1,0 +1,3 @@
+;number;text;x1;y1;x2;y2;y;diff_y;line;fixations;fix_distance;fix_duration;first_fix_duration;fix_number;pupil_l;pupil_r;distance;pupil;fix_duration_avg;go_past_time
+0;0;Julius;673;425;727;440;432.5;;1;[];[];0.0;0.0;0;;;108.43934631347656;;;
+1;1;Kuhn-Institutt;736;425;863;440;432.5;0.0;1;[np.float64(983.0), np.float64(984.0), np.float64(985.0), np.float64(986.0), np.float64(987.0)];[np.float64(2.4475584030151367), np.float64(8.30141963958738), np.float64(0.0), np.float64(13.774152183532692), np.float64(0.0)];852.0;150.0;5;;4.0444;0.0;;170.4;852.0

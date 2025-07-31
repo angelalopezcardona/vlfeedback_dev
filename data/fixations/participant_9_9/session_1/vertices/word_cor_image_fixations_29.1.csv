@@ -1,0 +1,4 @@
+;number;text;x1;y1;x2;y2;y;diff_y;line;fixations;fix_distance;fix_duration;first_fix_duration;fix_number;pupil_l;pupil_r;distance;pupil;fix_duration_avg;go_past_time
+0;0;Reaching;676;425;765;444;434.5;;1;[np.float64(815.0)];[np.float64(8.520364487289953)];234.0;234.0;1;3.0788;3.0944;48.78880543249445;3.09;234.0;234.0
+1;1;for;773;425;798;440;432.5;2.0;1;[];[];0.0;0.0;0;;;23.39023999304445;;;
+2;2;Home;806;425;861;440;432.5;0.0;1;[np.float64(816.0)];[np.float64(19.198550195472194)];758.0;758.0;1;3.206;3.1953;19.198550195472194;3.2;758.0;758.0

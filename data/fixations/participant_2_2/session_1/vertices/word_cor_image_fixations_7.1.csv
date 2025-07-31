@@ -1,0 +1,3 @@
+;number;text;x1;y1;x2;y2;y;diff_y;line;fixations;fix_distance;fix_duration;first_fix_duration;fix_number;pupil_l;pupil_r;distance;pupil;fix_duration_avg;go_past_time
+0;0;Jignesh;708;425;781;444;434.5;;1;[np.float64(1914.0)];[np.float64(22.24446246453698)];933.0;933.0;1;2.7663;2.8027;40.108032212110174;2.78;933.0;933.0
+1;1;Jain;789;425;827;440;432.5;2.0;1;[np.float64(1913.0), np.float64(1915.0)];[np.float64(25.554481812885854), np.float64(31.08540622047758)];624.0;233.0;2;2.7831;2.8011;31.08540622047758;2.79;312.0;1557.0
