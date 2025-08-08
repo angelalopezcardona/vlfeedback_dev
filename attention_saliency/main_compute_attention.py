@@ -7,13 +7,9 @@ from models.human_att import HumanAttentionExtractor
 from models.model_att import ModelAttentionExtractor
 import argparse
 
-path = "oasstetc_data/"
+path = "data/"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument(
-        "--reward",
-        default=False,
-    )
     args = parser.parse_args()
 
     models = {
@@ -22,26 +18,27 @@ if __name__ == "__main__":
     }
 
     users = range(1, 9)
+    trials = range(1, 31)
     for model_name, model_type in models.items():
-        for user_set in users:
+        for user in users:
             # Load the model
             model_name.replace("/", "_")
 
             folder_path_attention = (
                 path
-                + "attention_saliency/"
+                + "attention_saliency/results/"
                 + model_name.split("/")[1]
                 + "/set_"
-                + str(user_set)
+                + str(user)
                 + "/"
             )
      
-            folder_texts = path + "gaze_features_real" + "/set_" + str(user_set) + "/"
-            texts_trials = HumanAttentionExtractor().load_texts(folder_texts)
+            texts_trials = HumanAttentionExtractor().load_prompts()
             test_prompts = HumanAttentionExtractor.load_trial_prompts()
             att_extractor = ModelAttentionExtractor(model_name, model_type)
             word_level = True
-
+            #todo: contruct per trial the dict with the prompt, image_path and response
+ 
             attention_trials = att_extractor.extract_attention(
                 texts_trials, word_level=word_level
             )

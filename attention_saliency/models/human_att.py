@@ -4,6 +4,7 @@ from eyetrackpy.data_processor.models.eye_tracking_data_simple import (
     EyeTrackingDataUserSet,
 )
 import os
+from PIL import Image
 
 #adapt all this to the new files directorys
 class HumanAttentionExtractor:
@@ -30,8 +31,23 @@ class HumanAttentionExtractor:
         }
 
     @staticmethod
-    def load_trial_prompts(path="oasstetc_data/raw_data/"):
-        texts_prompts = pd.read_csv(path + "text_prompts.csv", sep=";")
+    def load_prompt_responses(prompt_number, path = "data/responses_files/"):
+        texts_prompts = pd.read_excel(path + "prompt_" + str(prompt_number) + ".xlsx", sep=";")
+        return texts_prompts
+    
+    @staticmethod
+    def load_prompt_image(prompt_number, path = "data/images/"):
+        image_path = path + "img_prompt_" + str(prompt_number) + ".jpg"
+        
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"JPG image file not found: {image_path}")
+        
+        image = Image.open(image_path)
+        return image
+    
+    @staticmethod
+    def load_prompts(path="data/prompts_files/"):
+        texts_prompts = pd.read_excel(path + "prompts.xlsx", sep=";")
         return texts_prompts
 
     @staticmethod

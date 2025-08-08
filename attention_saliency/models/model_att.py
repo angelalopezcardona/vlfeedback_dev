@@ -178,29 +178,33 @@ class ModelAttentionExtractor:
 
     def extract_attention(self, texts_trials: dict, word_level: bool = True):
         attention_trials = {}
-        for trial, list_text in texts_trials.items():
-            print("trial", trial)
-            list_word_original = [str(x) for x in list_text]
-            text = " ".join(list_word_original)
-            list_word_original = [x.lower() for x in list_word_original]
-            #TODO NEED TO READ THE IMAGE PATH HERE SOMEWHERE
-            inputs = self.process_prompt(self.processor, text, image_path)
-            attention = self.get_attention_model(self.model, inputs)
-            try:
-                #need to change this for the new prerocess
-                attention_trials[trial] = self.process_attention(
-                    attention,
-                    inputs,
-                    text=text,
-                    list_word_original=list_word_original,
-                    word_level=word_level,
-                )
-            except Exception as e:
-                print(trial, "error:", e)
+        for trial, trial_info in texts_trials.items():
+            #todo: revise what I do with one response and the other. I need to create it here.
+            attention_trial = self.extract_attention_trial(trial, trial_info['prompt'], trial_info['image_path'], word_level)
+            attention_trials[trial] = attention_trial
         return attention_trials
 
-
-
+    def extract_attention_trial(self, trial, list_text, image_path, word_level):
+        print("trial", trial)
+        list_word_original = [str(x) for x in list_text]
+        text = " ".join(list_word_original)
+        list_word_original = [x.lower() for x in list_word_original]
+        #TODO NEED TO READ THE IMAGE PATH HERE SOMEWHERE
+        inputs = self.process_prompt(self.processor, text, image_path)
+        attention = self.get_attention_model(self.model, inputs)
+        try:
+            #need to change this for the new prerocess
+            attention_trial = self.process_attention(
+                attention,
+                inputs,
+                text=text,
+                list_word_original=list_word_original,
+                word_level=word_level,
+            )
+        except Exception as e:
+            print(trial, "error:", e)
+        return attention_trial
+    
     @staticmethod
     def normalize_rows(matrix):
         cols_normalized = []
