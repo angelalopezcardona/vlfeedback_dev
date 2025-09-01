@@ -13,7 +13,7 @@ import os
 import os
 import sys
 
-# Se serve mantenere il path
+# If needed to maintain the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'fixation_visualizer'))
 
 from saliency_comparison import SaliencyEvaluator
@@ -32,7 +32,7 @@ def main():
     print("=" * 60)
     
     try:
-        # 1️⃣ Inizializza ed esegui valutazione globale (come ora)
+        # 1️⃣ Initialize and run global evaluation
         evaluator = SaliencyEvaluator(
             user_root="users",
             synthetic_salmaps_root="synthetic_salmaps", 
@@ -51,17 +51,17 @@ def main():
         print("   - salmaps/metrics/")
         print("=" * 60)
 
-        # 2️⃣ Esegui LOSO + human ceiling + test statistici
+        # 2️⃣ Run LOSO + human ceiling + statistical tests
         print("🔍 Running LOSO evaluation, human ceiling, and statistical tests...")
-        df_loso = evaluator.evaluate_loso()  # Ora ritorna il DataFrame
-        #summary = evaluator.analyze_loso_results(df_loso)  # Analisi dettagliata
+        df_loso = evaluator.evaluate_loso()  # Now returns the DataFrame
+        #summary = evaluator.analyze_loso_results(df_loso)  # Detailed analysis
         #sos = evaluator._run_mixed_effects(df_loso)
         evaluator.analyze_human_by_suffix()
         wilcoxon_test = evaluator.wilcoxon_loso_vs_global()
         
-        # Crea boxplot delle metriche
+        # Create boxplots of the metrics
         print("\n" + "="*60)
-        print("CREAZIONE BOXPLOT DELLE METRICHE")
+        print("CREATING METRIC BOXPLOTS")
         print("="*60)
         boxplots = evaluator.create_metric_boxplots()
 
