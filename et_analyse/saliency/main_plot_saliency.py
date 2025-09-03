@@ -72,12 +72,15 @@ if __name__ == "__main__":
     subject_fixations = ETDataLoader().load_subject_fixations(subjects = subjects, raw_data_path=raw_data_path)
     saliency_generator = SaliencyGenerator()
 
-    results_path_saliency = save_path + '/visalformer/saliency'
+    results_path_saliency_visalformer = save_path + '/visalformer/saliency'
+    results_path_saliency_mdsem = save_path + '/mdsem/salmaps_arrays'
 
     for prompt_number, _ in prompts.items():
         box_image = ETDataLoader().find_image_in_screenshot(prompts_screenshots[prompt_number], images[prompt_number], draw_result=False)
-        saliency_map_visalformer = np.load(results_path_saliency + '/saliency_trial_{}.npy'.format(prompt_number))
-        saliency_map_mdsem = saliency_map_visalformer
+        saliency_map_visalformer = np.load(results_path_saliency_visalformer + '/saliency_trial_{}.npy'.format(prompt_number))
+        # saliency_map_mdsem_05 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_500.npy'.format(prompt_number))
+        # saliency_map_mdsem_3 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_3000.npy'.format(prompt_number))
+        saliency_map_mdsem_5 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_5000.npy'.format(prompt_number))
         saliency_map_human = []
         for subject, saliency_maps in subject_saliency.items():
             fixations_trial = subject_fixations[subject]
@@ -89,7 +92,7 @@ if __name__ == "__main__":
         figure_name_mdsem="saliency_mdsem_{}.png".format(prompt_number)
         figure_name_human="saliency_human_{}.png".format(prompt_number)
         saliency_generator.create_overlay_and_save_saliency_map(images[prompt_number], saliency_map_visalformer, folder=figures_path, figure_name=figure_name_visalformer)
-        saliency_generator.create_overlay_and_save_saliency_map(images[prompt_number], saliency_map_mdsem, folder=figures_path, figure_name=figure_name_mdsem)
+        saliency_generator.create_overlay_and_save_saliency_map(images[prompt_number], saliency_map_mdsem_5, folder=figures_path, figure_name=figure_name_mdsem)
         saliency_generator.create_overlay_and_save_saliency_map(images[prompt_number], average_saliency_map_human, folder=figures_path, figure_name=figure_name_human)
     
     for prompt_number in prompt_number_plot:
