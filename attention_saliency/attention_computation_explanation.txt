@@ -1,0 +1,131 @@
+ATTENTION ROLLOUT AND OVERLAY COMPUTATION EXPLANATION
+=====================================================
+
+This document explains how attention rollout and overlay computation work for both 
+LLaVA and Fuyu multimodal language models, focusing on the conceptual approach 
+rather than implementation details.
+
+## OVERVIEW
+
+Both models use attention rollout to analyze how generated tokens attend to image patches
+during autoregressive generation. The key difference lies in how they process images:
+- LLaVA: Uses 24x24 grid patches (576 total patches) with 336x336 input size
+- Fuyu: Uses 30x30 pixel patches with variable grid size based on image dimensions
+
+## 1. ATTENTION ROLLOUT COMPUTATION
+
+### Core Concept
+
+The attention rollout algorithm computes how attention flows through the transformer layers
+during generation. Think of it as tracing how information flows from the input image patches
+through each layer of the model to the final generated tokens.
+
+### Step-by-Step Process
+
+#### Step 1: Generation with Attention Collection
+During text generation, we capture the attention weights at each step. This means for every
+new token the model generates, we record which parts of the input (including image patches)
+it's paying attention to in each layer.
+
+#### Step 2: Attention Rollout Implementation
+The core idea is to compose attention matrices from the last layer back to the first layer.
+This creates a "rollout" that shows the cumulative attention flow:
+
+1. **Layer-by-Layer Composition**: Starting from the last layer, we work backwards through
+   each layer, combining their attention patterns. This is like following a chain of
+   attention from the output back to the input.
+
+2. **Residual Connection Handling**: Since transformers have skip connections, we account
+   for these by adding an identity matrix to each attention matrix. This ensures that
+   information can flow directly through layers without being lost.
+
+3. **Head Averaging**: Each layer has multiple attention heads that focus on different
+   aspects. We average across all heads to get a unified attention pattern.
+
+4. **Normalization**: Each attention matrix is normalized so that the attention weights
+   sum to 1, making them interpretable as probability distributions.
+
+#### Step 3: Image Token Extraction
+Once we have the complete attention rollout, we extract the attention patterns specifically
+for image patches. This gives us a map showing how much each image region contributed to
+the final generation.
+
+We compute two types of aggregations:
+- **Mean Attention**: Average attention across all generated tokens - shows consistent
+  attention patterns
+- **Max Attention**: Maximum attention across all generated tokens - highlights the most
+  attended regions
+
+## 2. OVERLAY COMPUTATION
+
+### LLaVA Overlay Process
+
+LLaVA requires a complex overlay process because of how it preprocesses images:
+
+#### The Challenge
+LLaVA first resizes images so the shorter side becomes 336 pixels, then center-crops to create
+a 336x336 square. This means the attention map we get is for this processed version, not the
+original image. To create a meaningful overlay, we need to "reverse" this transformation.
+
+#### The Solution
+1. **Upscale the Attention Map**: We take the 24x24 attention grid and expand it to 336x336
+   using nearest neighbor interpolation. This preserves the patch boundaries and gives us
+   the attention map at the model's input resolution.
+
+2. **Reverse the Preprocessing**: We recreate the intermediate step where the original image
+   was resized to have a short side of 336 pixels. We place our 336x336 attention map at
+   the center of this intermediate canvas, accounting for the center-crop operation.
+
+3. **Map Back to Original**: Finally, we resize this intermediate attention map back to the
+   original image dimensions. This gives us an attention map that aligns perfectly with
+   the original image.
+
+4. **Visual Enhancement**: We apply Gaussian blur to smooth the blocky patch boundaries
+   and use a power transformation to emphasize the most attended regions. The result is
+   a smooth, interpretable heatmap overlaid on the original image.
+
+### Fuyu Overlay Process
+
+Fuyu uses a much simpler approach because it processes images more directly:
+
+#### Direct Patch Mapping
+Fuyu divides images into 30x30 pixel patches without complex preprocessing. This means
+the attention map we get directly corresponds to regions in the original image.
+
+#### Simple Overlay Creation
+1. **Patch-to-Pixel Mapping**: Each attention value in our grid corresponds to a 30x30
+   pixel region in the original image. We simply fill each patch region with its
+   corresponding attention value.
+
+2. **Smooth Visualization**: We apply light Gaussian blur to soften the patch boundaries
+   and use the same power transformation to highlight important regions.
+
+3. **Color Overlay**: The attention values are converted to colors using a heat map
+   (typically red for high attention, blue for low attention) and blended with the
+   original image.
+
+This approach is much more straightforward because there's no complex preprocessing to reverse.
+
+## 3. KEY DIFFERENCES BETWEEN MODELS
+
+### LLaVA (llava-1.5-13b-hf)
+- **Image Processing**: Complex preprocessing with resizing and center-cropping to 336x336
+- **Patch Grid**: Fixed 24x24 grid (576 patches) regardless of original image size
+- **Token Type**: Uses special `<image>` tokens to represent image patches
+- **Overlay Complexity**: Requires carefully reversing the preprocessing transformations
+- **Grid Size**: Always 24x24 because of the fixed 336x336 input size
+
+### Fuyu (fuyu-8b)
+- **Image Processing**: Direct patch-based processing without complex preprocessing
+- **Patch Size**: 30x30 pixels per patch, maintaining original image proportions
+- **Token Type**: Uses special `|SPEAKER|` tokens to represent image patches
+- **Overlay Simplicity**: Direct mapping from attention grid to image regions
+- **Grid Size**: Variable based on image dimensions (e.g., 17x13 for a 510x390 image)
+
+### Aggregation Methods
+We use two different ways to combine attention across generated tokens:
+- **Mean Attention**: Takes the average attention across all generated tokens, showing
+  which regions are consistently important throughout the generation process
+- **Max Attention**: Takes the maximum attention across all generated tokens, highlighting
+  the regions that received the highest attention at any point during generation
+
