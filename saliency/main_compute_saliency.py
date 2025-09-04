@@ -7,16 +7,17 @@ from utils.data_loader import ETDataLoader
 import numpy as np
 from eyetrackpy.data_processor.models.saliency_generator import SaliencyGenerator
 if __name__ == "__main__":
-    subjects = [10]
+    subjects = [1,2,3,4,5,6,7,8, 9,10, 11,12,14,15]
+    subjects = [11,12,14,15]
     # paths
-    cwd = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) 
     raw_data_path = cwd + "/data/raw/et"
     process_data_path = cwd + "/data/processed/et/saliency/"
     #load raw data
     responses, images, prompts, prompts_screenshots = ETDataLoader().load_data(raw_data_path=raw_data_path)
     box_images = {}
     for prompt_number, _ in prompts.items():
-        box_images[prompt_number] = ETDataLoader().find_image_in_screenshot(prompts_screenshots[prompt_number], images[prompt_number], draw_result=True, out_path=raw_data_path + "/match_vis_{}.png".format(str(prompt_number)))
+        box_images[prompt_number] = ETDataLoader().find_image_in_screenshot(prompts_screenshots[prompt_number], images[prompt_number], draw_result=True, out_path=raw_data_path + "/screenshots_images/match_vis_{}.png".format(str(prompt_number)))
     subject_fixations = ETDataLoader().load_subject_fixations(subjects=subjects, raw_data_path=raw_data_path)
     # generate and load saliency
     saliency_generator = SaliencyGenerator()
