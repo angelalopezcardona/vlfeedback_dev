@@ -8,6 +8,8 @@ import numpy as np
 from eyetrackpy.data_processor.models.saliency_generator import SaliencyGenerator
 from eyetrackpy.data_generator.utils.saliency_metrics import compute_cc, compute_kl, compute_nss, compute_auc, compute_sim
 import pandas as pd
+cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(cwd)
 
  # Define model names and their corresponding data
 model_names = ['Visalformer', 'MDSEM-500', 'MDSEM-3000', 'MDSEM-5000']

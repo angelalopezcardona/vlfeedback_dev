@@ -3,11 +3,12 @@ import os
 # Set the timeout to 5 seconds
 os.environ["PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT"] = "5.0"
 
-from models.human_att import HumanAttentionExtractor
+from utils.data_loader import ETDataLoader
 from models.model_att import ModelAttentionExtractor
 import argparse
 
-path = "oasstetc_data/"
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
@@ -42,14 +43,20 @@ if __name__ == "__main__":
         "nicolinho/QRM-Llama3.1-8B": "QRLlama",
     }
 
-    users_set = range(1, 9)
+    users = range(1, 11)
+    cwd = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    raw_data_path = cwd + "/data/raw/et"
+    process_data_path = cwd + "/data/processed/et"
+    save_path= cwd + '/results/et/'
+
+    responses, images, prompts, prompts_screenshots = ETDataLoader().load_data(raw_data_path=raw_data_path)
     for model_name, model_type in models.items():
-        for user_set in users_set:
+        for user_set in users:
             # Load the model
             model_name.replace("/", "_")
             if reward is False:
                 folder_path_attention = (
-                    path
+                    save_path
                     + "attention/"
                     + model_name.split("/")[1]
                     + "/set_"
@@ -58,30 +65,28 @@ if __name__ == "__main__":
                 )
             else:
                 folder_path_attention = (
-                    path
+                    save_path
                     + "attention_reward/"
                     + model_name.split("/")[1]
                     + "/set_"
                     + str(user_set)
                     + "/"
                 )
-            folder_texts = path + "gaze_features_real" + "/set_" + str(user_set) + "/"
-            texts_trials = HumanAttentionExtractor().load_texts(folder_texts)
-            test_prompts = HumanAttentionExtractor.load_trial_prompts()
+            
             att_extractor = ModelAttentionExtractor(model_name, model_type)
             word_level = True
             if reward is False:
                 attention_trials = att_extractor.extract_attention(
-                    texts_trials, word_level=word_level
+                    responses, word_level=word_level
                 )
             else:
                 attention_trials = att_extractor.extract_attention_reward(
-                    texts_trials, texts_promps=test_prompts
+                    responses, texts_promps=prompts
                 )
             if word_level:
                 att_extractor.save_attention_df(
                     attention_trials,
-                    texts_trials=texts_trials,
+                    texts_trials=responses,
                     path_folder=folder_path_attention,
                 )
             else:
