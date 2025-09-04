@@ -13,7 +13,7 @@ from transformers import (
     BatchEncoding,
 )
 
-from models.model_loader import ModelLoaderFactory
+from attention.models.model_loader import ModelLoaderFactory
 
 
 class ModelAttentionExtractor:
@@ -246,22 +246,24 @@ class ModelAttentionExtractor:
     def extract_attention(self, texts_trials: dict, word_level: bool = True):
         attention_trials = {}
         for trial, list_text in texts_trials.items():
+            if not '.' in str(trial):
+                continue
             print("trial", trial)
             list_word_original = [str(x) for x in list_text]
             text = " ".join(list_word_original)
             list_word_original = [x.lower() for x in list_word_original]
             input_ids = self.tokenize_text(self.tokenizer, text)
             attention = self.get_attention_model(self.model, input_ids)
-            try:
-                attention_trials[trial] = self.process_attention(
-                    attention,
-                    input_ids,
-                    text=text,
-                    list_word_original=list_word_original,
-                    word_level=word_level,
-                )
-            except Exception as e:
-                print(trial, "error:", e)
+            # try:
+            attention_trials[trial] = self.process_attention(
+                attention,
+                input_ids,
+                text=text,
+                list_word_original=list_word_original,
+                word_level=word_level,
+            )
+            # except Exception as e:
+            #     print(trial, "error:", e)
         return attention_trials
 
     @staticmethod

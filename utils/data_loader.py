@@ -10,6 +10,7 @@ import cv2
 import re
 import pathlib
 #adapt all this to the new files directorys
+
 class ETDataLoader:
     def load_gaze_features(self, folder):
         datauserset = EyeTrackingDataUserSet()
@@ -267,5 +268,10 @@ class ETDataLoader:
             subjects_data[subject] = data
 
         return subjects_data
+    
+    def load_texts_responses(self, raw_data_path=None):
+        folder = raw_data_path + "/fixations/participant_" + str(1) + "_" + str(1) + "/session_1/"
+        data = self.load_gaze_features(folder)
+        return {trial: list(fixations_trial.text) for trial, fixations_trial in data.items()}
 
 

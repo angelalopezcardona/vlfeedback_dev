@@ -12,9 +12,9 @@ from transformers import (
     BatchEncoding,
 )
 
-from models.reward_models.llama_rm import LlamaRewardModel
-from models.reward_models.qrmllama_rm import LlamaForRewardModelWithGating
-from models.reward_models.eurus_rm import EurusRewardModel
+from attention.models.reward_models.llama_rm import LlamaRewardModel
+# from attention.models.reward_models.qrmllama_rm import LlamaForRewardModelWithGating
+from attention.models.reward_models.eurus_rm import EurusRewardModel
 
 
 class ModelLoaderCausal:
@@ -67,24 +67,24 @@ class ModelLoaderUltra:
         return model
 
 
-class ModelLoaderQRLlama:
-    def load_tokenizer(self, model_name):
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name, trust_remote_code=True, use_fast=True
-        )
+# class ModelLoaderQRLlama:
+#     def load_tokenizer(self, model_name):
+#         tokenizer = AutoTokenizer.from_pretrained(
+#             model_name, trust_remote_code=True, use_fast=True
+#         )
 
-        return tokenizer
+#         return tokenizer
 
-    def load_model(self, model_name):
-        # Load model directly
-        print("Loading ModelLoaderQRLlama model")
-        model = LlamaForRewardModelWithGating.from_pretrained(
-            model_name,
-            device_map="auto",
-            trust_remote_code=True,
-            output_attentions=True,
-        )
-        return model
+#     def load_model(self, model_name):
+#         # Load model directly
+#         print("Loading ModelLoaderQRLlama model")
+#         model = LlamaForRewardModelWithGating.from_pretrained(
+#             model_name,
+#             device_map="auto",
+#             trust_remote_code=True,
+#             output_attentions=True,
+#         )
+#         return model
 
 
 class ModelLoaderEurus:
@@ -128,8 +128,8 @@ class ModelLoaderFactory:
             return ModelLoaderReward()
         elif loader_type == "ultraRM":
             return ModelLoaderUltra()
-        elif loader_type == "QRLlama":
-            return ModelLoaderQRLlama()
+        # elif loader_type == "QRLlama":
+        #     return ModelLoaderQRLlama()
         elif loader_type == "eurus":
             return ModelLoaderEurus()
 

@@ -16,7 +16,8 @@ from transformers import (
     LlamaForSequenceClassification,
     AutoModelForSequenceClassification,
 )
-from transformers.models.llama.modeling_llama import LLAMA_INPUTS_DOCSTRING
+# LLAMA_INPUTS_DOCSTRING has been removed in newer transformers versions
+# from transformers.models.llama.modeling_llama import LLAMA_INPUTS_DOCSTRING
 from transformers.utils import ModelOutput
 from transformers.utils import add_start_docstrings_to_model_forward
 
@@ -129,7 +130,7 @@ class LlamaForRewardModelWithGating(LlamaPreTrainedModel):
             n_hidden=config_dict.get("gating_n_hidden", 3),
         )
 
-    @add_start_docstrings_to_model_forward(LLAMA_INPUTS_DOCSTRING)
+    @add_start_docstrings_to_model_forward("")
     def forward(
         self,
         input_ids: torch.LongTensor = None,

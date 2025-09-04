@@ -413,15 +413,12 @@ class CompareAttention:
         self,
         gaze_feature="fix_duration_n",
         save=True,
-        filter_completed=False,
         folder_attention="attention",
     ):
-        folder_filter = "completed" if filter_completed else "not_filtered"
         tags_chosen_rejected = ["chosen", "rejected"]
         for tag_chosen_rejected in tags_chosen_rejected:
             sc_users_all, sc_users_all_data = self.compute_sc_all_userset(
                 gaze_feature=gaze_feature,
-                filter_completed=filter_completed,
                 filter_cr=tag_chosen_rejected,
                 folder_attention=folder_attention,
             )
@@ -442,7 +439,6 @@ class CompareAttention:
                     + "/"
                     + tag_chosen_rejected
                     + str("/")
-                    + str(folder_filter)
                 )
 
                 if not os.path.exists(folder_to_save):
@@ -517,60 +513,49 @@ class CompareAttention:
     def compute_sc_all_userset(
         self,
         gaze_feature="fix_duration_n",
-        filter_completed=False,
         filter_cr=False,
         folder_attention="attention",
     ):
         # Load the model
         attention_trials, real_gaze_fixations, filter_trials = {}, {}, []
-        for user_set in range(1, 9):
-            folder_path_attention = (
-                self.path
-                + str(folder_attention)
-                + "/"
-                + self.model_name.split("/")[1]
-                + "/set_"
-                + str(user_set)
-                + "/"
-            )
-            folder_fixations = (
-                self.path + "gaze_features_real" + "/set_" + str(user_set) + "/"
-            )
-            # load fixations of user and concat
-            real_gaze_fixations_user = HumanAttentionExtractor().load_gaze_features(
-                folder_fixations
-            )
-            real_gaze_fixations = {**real_gaze_fixations_user, **real_gaze_fixations}
-            # load attention of user and concat
-            print(folder_path_attention)
-            attention_trials_user = ModelAttentionExtractor.load_attention_df(
-                folder_path_attention
-            )
-            attention_trials = {**attention_trials, **attention_trials_user}
+        folder_path_attention = (
+            self.path
+            + str(folder_attention)
+            + "/"
+            + self.model_name.split("/")[1]
+            + "/"
+        )
+        folder_fixations = (
+            self.path +  "/fixations/participant_" + str(1) + "_" + str(1) + "/session_1/"
+        )
+        # load fixations of user and concat
+        real_gaze_fixations_user = HumanAttentionExtractor().load_gaze_features(
+            folder_fixations
+        )
+        real_gaze_fixations = {**real_gaze_fixations_user, **real_gaze_fixations}
+        # load attention of user and concat
+        print(folder_path_attention)
+        attention_trials_user = ModelAttentionExtractor.load_attention_df(
+            folder_path_attention
+        )
+        attention_trials = {**attention_trials, **attention_trials_user}
 
-            # load filter triasl info
-            info_trials = HumanAttentionExtractor().load_trials_info(folder_fixations)
-            # filter for all trial that were answered with the 3 particpants of this session
-            if filter_completed is True:
-                filter_trials_user = info_trials["complete"]
-            else:
-                filter_trials_user = info_trials["all"]
-            # -------------------------------------------
-            # filter for the chosen and the rejected ones
-            if filter_cr == "chosen":
-                # remove all trials dont end with .1
-                filter_trials_user = [
-                    trial for trial in filter_trials_user if str(trial).endswith(".1")
-                ]
-            elif filter_cr == "rejected":
-                # remove all trials dont end with .1
-                filter_trials_user = [
-                    trial
-                    for trial in filter_trials_user
-                    if not str(trial).endswith(".1")
-                ]
-            filter_trials.extend(filter_trials_user)
-            # -------------------------------------------
+        # -------------------------------------------
+        # filter for the chosen and the rejected ones
+        if filter_cr == "chosen":
+            # remove all trials dont end with .1
+            filter_trials_user = [
+                trial for trial in filter_trials_user if str(trial).endswith(".1")
+            ]
+        elif filter_cr == "rejected":
+            # remove all trials dont end with .1
+            filter_trials_user = [
+                trial
+                for trial in filter_trials_user
+                if not str(trial).endswith(".1")
+            ]
+        filter_trials.extend(filter_trials_user)
+        # -------------------------------------------
 
         sc_layers, sc_layers_all = {}, {}
         for layer in list(list(attention_trials.values())[0].keys()):
@@ -588,9 +573,7 @@ class CompareAttention:
 
     def compute_sc_user_set(
         self,
-        user_set,
         gaze_feature="fix_duration_n",
-        filter_completed=False,
         filter_cr=False,
         folder_attention="attention",
     ):
@@ -600,22 +583,17 @@ class CompareAttention:
             + str(folder_attention)
             + "/"
             + self.model_name.split("/")[1]
-            + "/set_"
-            + str(user_set)
             + "/"
         )
         folder_fixations = (
-            self.path + "gaze_features_real" + "/set_" + str(user_set) + "/"
+            self.path +  "/fixations/participant_" + str(1) + "_" + str(1) + "/session_1/"
         )
         real_gaze_fixations = HumanAttentionExtractor().load_gaze_features(
             folder_fixations
         )
         info_trials = HumanAttentionExtractor().load_trials_info(folder_fixations)
         # filter for all trial that were answered with the 3 particpants of this session
-        if filter_completed is True:
-            filter_trials = info_trials["complete"]
-        else:
-            filter_trials = info_trials["all"]
+
         # -------------------------------------------
         # filter for the chosen and the rejected ones
         if filter_cr == "chosen":
@@ -649,14 +627,12 @@ class CompareAttention:
     def plot_attention_all_trials(
         self, gaze_features: list, attention_folder="attention", filter_completed=True
     ):
-        folder_filter = "completed" if filter_completed else "not_filtered"
         path = (
             str(self.path)
             + attention_folder
             + "/"
             + str(self.model_name.split("/")[1])
             + str("/")
-            + str(folder_filter)
         )
         data = pd.DataFrame()
         for gaze_feature in gaze_features:
