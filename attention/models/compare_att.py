@@ -3,6 +3,16 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import sys
+import os
+cwd = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(cwd)
+cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(cwd)
+cwd = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(cwd)
+cwd = os.path.abspath(__file__)
+sys.path.append(cwd)
 from models.human_att import HumanAttentionExtractor
 from utils.data_loader import ETDataLoader
 from models.model_att import ModelAttentionExtractor
@@ -618,7 +628,7 @@ class CompareAttention:
         return sc_layers
 
     def plot_attention_all_trials(
-        self, gaze_features: list, attention_folder="attention", filter_completed=True
+        self, gaze_features: list, attention_folder="attention"
     ):
         path = (
             str(self.path)
@@ -626,6 +636,7 @@ class CompareAttention:
             + "/"
             + str(self.model_name.split("/")[1])
             + str("/")
+            + str("all" + "/")
         )
         data = pd.DataFrame()
         for gaze_feature in gaze_features:
