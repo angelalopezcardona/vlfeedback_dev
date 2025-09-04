@@ -10,28 +10,49 @@ import statsmodels.formula.api as smf
 class SaliencyEvaluator:
     def __init__(self, user_root="users", synthetic_salmaps_root="synthetic_salmaps", original_images_root="images", output_dir="salmaps", n_prompts=30):
         """
-        A class for evaluating and comparing saliency maps from different eye-tracking devices (Tobii and Gazepoint) with synthetic saliency maps.
+        A comprehensive saliency evaluation framework for comparing human eye-tracking data with synthetic saliency maps.
         
-        This evaluator processes user fixation data and compares it with synthetic saliency maps.
-        It calculates three metrics for each image and each suffix (500, 3000, 5000, full):
-        - CC (Pearson Correlation Coefficient): Measures linear correlation between maps
-        - KL (Kullback-Leibler divergence): Measures information loss between distributions
-        - SIM (Similarity): Measures the intersection of the two distributions
+        This class provides a complete pipeline for saliency map analysis, including:
         
-        Output:
-        - Creates subfolders: salmaps, salmaps_vis, salmaps_arrays, metrics
-        - Generates average saliency maps for each trial and suffix
-        - Creates CSV files in the 'salmaps/metrics' directory containing:
-          * metrics_tobii.csv: Individual metrics for Tobii data
-          * metrics_gazepoint.csv: Individual metrics for Gazepoint data
-          * global_metrics.csv: Average metrics for each suffix (full suffix is compared with 5000 synthetic maps)
+        CORE FUNCTIONALITY:
+        - Processes user fixation data from multiple participants across different time windows (500ms, 3000ms, 5000ms, full)
+        - Generates average human saliency maps by aggregating individual participant data
+        - Compares human saliency maps with synthetic model predictions using three standard metrics:
+          * CC (Pearson Correlation Coefficient): Linear correlation between maps
+          * KL (Kullback-Leibler divergence): Information loss between probability distributions  
+          * SIM (Similarity): Intersection of normalized distributions
+        
+        ADVANCED ANALYSIS METHODS:
+        - evaluate_loso(): Leave-One-Subject-Out cross-validation for unbiased model evaluation
+        - analyze_loso_results(): Comprehensive statistical analysis of LOSO results
+        - analyze_human_by_suffix(): Detailed analysis of human performance across time windows
+        - wilcoxon_loso_vs_global(): Statistical comparison between LOSO and global evaluation methods
+        - _run_stat_tests(): Paired statistical tests (t-test/Wilcoxon) between human and model performance
+        - _run_mixed_effects(): Linear mixed-effects models accounting for image and participant random effects
+        - create_metric_boxplots(): Visualization of performance metrics across time windows
+        
+        OUTPUT STRUCTURE:
+        Creates organized output directories:
+        - salmaps/: Average human saliency maps (grayscale PNG)
+        - salmaps_vis/: Overlay visualizations of saliency on original images
+        - salmaps_arrays/: Raw saliency data (NumPy arrays)
+        - metrics/: All statistical results and analysis files
+        - plots/: Visualization outputs (boxplots, etc.)
+        
+        KEY OUTPUT FILES:
+        - metrics_results.csv: Individual image-level metrics
+        - global_metrics.csv: Aggregated metrics by time window
+        - metrics_loso.csv: Leave-one-subject-out evaluation results
+        - stat_tests_results.csv: Statistical test results (human vs model)
+        - human_ceiling.csv: Human performance ceiling estimates
+        - wilcoxon_loso_vs_global.csv: Comparison of evaluation methodologies
         
         Args:
-            user_root: Root path of user data (default: "users")
-            synthetic_salmaps_root: Path of synthetic saliency maps (default: "synthetic_salmaps")
-            original_images_root: Path of original images (default: "images")
-            output_dir: Output directory for results (default: "salmaps")
-            n_prompts: Number of prompts to evaluate (default: 30)
+            user_root: Root directory containing participant data (default: "users")
+            synthetic_salmaps_root: Directory with synthetic saliency maps (default: "synthetic_salmaps")
+            original_images_root: Directory with original stimulus images (default: "images")
+            output_dir: Base output directory for all results (default: "salmaps")
+            n_prompts: Number of image prompts to process (default: 30)
         """
         self.user_root = user_root
         self.synthetic_salmaps_root = synthetic_salmaps_root
@@ -194,7 +215,7 @@ class SaliencyEvaluator:
     
     def _collect_saliency_maps(self, img_id, suffix):
         """
-        Collects .npy maps from all users for an image and suffix.
+        Collects the .npy maps of all users for an image and suffix.
         """
         saliency_stack = []
 
@@ -288,14 +309,14 @@ class SaliencyEvaluator:
             else:
                 print(f"[Warning] Missing original image for img_prompt_{img_id}")
             
-            # 6️⃣ Calculate metrics by comparing synthetic map with average GT (NPY only)
-            # For 'full' suffix, compare with '5000' of synthetic ones
+            # 6️⃣ Calculate metrics comparing synthetic map with average GT (NPY only)
+            # For 'full' suffix, compare with '5000' of synthetics
             if suffix == 'full':
                 synthetic_suffix = '5000'
             else:
                 synthetic_suffix = suffix
                 
-            for synthetic_map_type in ['salmaps_arrays']:  # NPY files only
+            for synthetic_map_type in ['salmaps_arrays']:  # Only NPY files
                 synthetic = self._load_synthetic_map(img_id, suffix, synthetic_map_type)
                 if synthetic is None:
                     print(f"[Warning] Missing synthetic {synthetic_map_type} for img_prompt_{img_id}_{suffix} (using {synthetic_suffix})")
@@ -329,12 +350,12 @@ class SaliencyEvaluator:
         # Calculate and save global metrics for each suffix and type
         global_metrics = []
         for suffix in self.suffixes:
-            for map_type in ['salmaps_array']:  # NPY files only
-                # For 'full' suffix, use data from '5000' suffix for synthetic ones
+            for map_type in ['salmaps_array']:  # Only NPY files
+                # For 'full' suffix, use data from '5000' suffix for synthetics
                 if suffix == 'full':
                     # Create a copy of '5000' suffix data for 'full' suffix
                     suffix_5000_data = self.metrics_tobii.copy()
-                    # Replace all '5000' suffixes with 'full' for synthetic ones
+                    # Replace all '5000' suffixes with 'full' for synthetics
                     for i, s in enumerate(suffix_5000_data["suffix"]):
                         if s == '5000':
                             suffix_5000_data["suffix"][i] = 'full'
@@ -395,25 +416,25 @@ class SaliencyEvaluator:
 
     def evaluate_loso(self):
         """
-        Calculates LOSO metrics for each user and image, human ceiling,
-        and prepares data for statistical tests.
-        CORRECT: Applies LOSO to both humans and model.
+        Calculate LOSO metrics for each user and image, human ceiling,
+        and prepare data for statistical tests.
+        CORRECT: Apply LOSO to both humans and model.
         """
         loso_records = []
-        utenti = [u for u in os.listdir(self.user_root) if u.startswith('participant_') and os.path.isdir(os.path.join(self.user_root, u))]
+        users = [u for u in os.listdir(self.user_root) if u.startswith('participant_') and os.path.isdir(os.path.join(self.user_root, u))]
 
         for img_id in range(1, self.n_prompts + 1):
             for suffix in self.suffixes:
-                # Load maps from all users for this image
+                # Load maps of all users for this image
                 saliency_stack = {}
-                for user in utenti:
+                for user in users:
                     maps = self._collect_saliency_maps_for_user(user, img_id, suffix)
                     if maps is not None:
                         saliency_stack[user] = maps
                 
                 # Need at least 2 users to do LOSO
                 if len(saliency_stack) < 2:
-                    print(f"Warning: Solo {len(saliency_stack)} utenti per img_{img_id}{suffix}, salto...")
+                    print(f"Warning: Only {len(saliency_stack)} users for img_{img_id}{suffix}, skipping...")
                     continue
 
                 # ==============================================
@@ -439,11 +460,11 @@ class SaliencyEvaluator:
                 # ==============================================
                 # LOSO for MODEL (NEW - CORRECT)
                 # ==============================================
-                # For 'full' suffix, use '5000' for synthetic ones
+                # For 'full' suffix, use '5000' for synthetics
                 synthetic_suffix = '5000' if suffix == 'full' else suffix
                 synthetic = self._load_synthetic_map(img_id, suffix, 'salmaps_arrays')
                 if synthetic is not None:
-                    # For each user we "leave out", we compare the model
+                    # For each user we "leave out", compare the model
                     # with the average of OTHER users (same approach as humans)
                     for left_out_user in saliency_stack:
                         others = [arr for u, arr in saliency_stack.items() if u != left_out_user]
@@ -465,7 +486,7 @@ class SaliencyEvaluator:
                         }
                         loso_records.append(rec)
                 else:
-                    print(f"Warning: Mappa sintetica non trovata per img_{img_id}{suffix} (using synthetic_{synthetic_suffix})")
+                    print(f"Warning: Synthetic map not found for img_{img_id}{suffix} (using synthetic_{synthetic_suffix})")
 
         # Save all LOSO results
         df_loso = pd.DataFrame(loso_records)
@@ -477,7 +498,7 @@ class SaliencyEvaluator:
         human_ceiling.to_csv(os.path.join(self.metrics_dir, 'human_ceiling.csv'), index=False)
         print("Human ceiling saved.")
 
-        # Execute correct statistical tests
+        # Run correct statistical tests
         self._run_stat_tests(df_loso)
     
         return df_loso  # Return for any additional analysis
@@ -500,13 +521,13 @@ class SaliencyEvaluator:
 
     def _run_stat_tests(self, df_loso):
         """
-        Executes statistical tests between model and humans for each metric.
-        CORRECT: Compares average LOSO performance per image+suffix.
+        Run statistical tests between model and humans for each metric.
+        CORRECT: Compare average LOSO performance per image+suffix.
         """
         results = []
         
         for metric in ['CC','KL','SIM']:
-            print(f"\n=== Test statistici per {metric} ===")
+            print(f"\n=== Statistical tests for {metric} ===")
             
             # CORRECT AGGREGATION:
             # For each combination (img_id, suffix), calculate the average of LOSO performance
@@ -530,8 +551,8 @@ class SaliencyEvaluator:
             mod_vals = df_pair[f"{metric}_model"].values
             
             print(f"N pairs: {len(df_pair)}")
-            print(f"Human average: {hum_vals.mean():.4f} ± {hum_vals.std():.4f}")
-            print(f"Model average: {mod_vals.mean():.4f} ± {mod_vals.std():.4f}")
+            print(f"Human mean: {hum_vals.mean():.4f} ± {hum_vals.std():.4f}")
+            print(f"Model mean: {mod_vals.mean():.4f} ± {mod_vals.std():.4f}")
             
             # Differences
             diffs = hum_vals - mod_vals
@@ -559,7 +580,7 @@ class SaliencyEvaluator:
                     stat, p_val = None, None
                     print("Too few samples for Wilcoxon test")
 
-            # Effect size (Cohen's d for paired data)
+            # Effect size (Cohen's d per paired data)
             if len(diffs) > 1:
                 cohens_d = diffs.mean() / diffs.std()
             else:
@@ -599,8 +620,8 @@ class SaliencyEvaluator:
 
     def _run_mixed_effects(self, df_loso):
         """
-        Executes a mixed effects linear model: metric ~ source + (1|img_id) + (1|left_out_user)
-        CORRECT: Uses left_out_user as random effect instead of user for the model.
+        Runs a linear mixed effects model: metric ~ source + (1|img_id) + (1|left_out_user)
+        NOTE: Uses left_out_user as random effect instead of user for the model.
         """
         try:
             import statsmodels.api as sm
@@ -611,7 +632,7 @@ class SaliencyEvaluator:
             return
 
         for metric in ['CC','KL','SIM']:
-            print(f"\n--- Mixed Effects per {metric} ---")
+            print(f"\n--- Mixed Effects for {metric} ---")
             
             try:
                 # Prepare data for mixed effects
@@ -622,7 +643,7 @@ class SaliencyEvaluator:
                 model_data['img_id_cat'] = pd.Categorical(model_data['img_id'])
                 model_data['left_out_user_cat'] = pd.Categorical(model_data['left_out_user'])
                 
-                # Verify we have sufficient data
+                # Check that we have enough data
                 print(f"Total observations: {len(model_data)}")
                 print(f"Humans: {len(model_data[model_data['source'] == 'human'])}")
                 print(f"Model: {len(model_data[model_data['source'] == 'model'])}")
@@ -630,7 +651,7 @@ class SaliencyEvaluator:
                 print(f"Unique left-out users: {model_data['left_out_user'].nunique()}")
                 
                 if len(model_data) < 10:
-                    print(f"Warning: Too few data ({len(model_data)}) for mixed effects")
+                    print(f"Warning: Too few data points ({len(model_data)}) for mixed effects")
                     continue
                 
                 # Model with random intercepts for img_id and left_out_user
@@ -644,7 +665,7 @@ class SaliencyEvaluator:
                                 re_formula="~1",
                                 vc_formula={"left_out_user_cat": "0 + left_out_user_cat"})
                 
-                mdf = md.fit(method='nm')  # Nelder-Mead often more stable
+                mdf = md.fit(method='nm')  # Nelder-Mead is often more stable
                 
                 print(f"\nModel: {formula}")
                 print("=" * 50)
@@ -667,7 +688,7 @@ class SaliencyEvaluator:
                     
             except Exception as e:
                 print(f"Error in mixed effects for {metric}: {str(e)}")
-                print("Possible causes: convergence failed or too few data")
+                print("Possible causes: failed convergence or too little data")
                 continue
                 
         print("\n" + "="*50)
@@ -689,37 +710,37 @@ class SaliencyEvaluator:
         print(f"Suffixes: {df_loso['suffix'].nunique()}")
         print(f"Unique users: {df_loso['left_out_user'].nunique()}")
         
-        # 2. Average performance per source
-        print("\n2. AVERAGE PERFORMANCE:")
+        # 2. Mean performance per source
+        print("\n2. MEAN PERFORMANCE:")
         summary_stats = df_loso.groupby('source')[['CC','KL','SIM']].agg(['mean', 'std', 'count'])
         print(summary_stats.round(4))
         
-        # 3. Performance per suffix
-        print("\n3. PERFORMANCE PER SUFFIX:")
+        # 3. Performance by suffix
+        print("\n3. PERFORMANCE BY SUFFIX:")
         suffix_stats = df_loso.groupby(['source', 'suffix'])[['CC','KL','SIM']].mean()
         print(suffix_stats.round(4))
-        print("\n3. PERFORMANCE PER SUFFIX and img_id:")
+        print("\n3. PERFORMANCE BY SUFFIX and img_id:")
         img_means = df_loso.groupby(['source','suffix','img_id'])[['CC','KL','SIM']].mean()
 
-        # then average of images
+        # then mean of images
         suffix_stats = img_means.groupby(['source','suffix'])[['CC','KL','SIM']].mean()
         print(suffix_stats.round(4))
         
-        # 4. Variability between images
-        print("\n4. VARIABILITY BETWEEN IMAGES (top/bottom 3):")
+        # 4. Variability across images
+        print("\n4. VARIABILITY ACROSS IMAGES (top/bottom 3):")
         for metric in ['CC', 'KL', 'SIM']:
             img_means = df_loso.groupby(['source', 'img_id'])[metric].mean().unstack(level=0)
             if 'human' in img_means.columns and 'model' in img_means.columns:
-                # Images where model performs better
+                # Images where model does better
                 diff = img_means['model'] - img_means['human'] 
-                print(f"\n{metric} - Images where MODEL performs better:")
+                print(f"\n{metric} - Images where MODEL does better:")
                 best_imgs = diff.nlargest(3)
                 for img_id, diff_val in best_imgs.items():
                     h_val = img_means.loc[img_id, 'human']
                     m_val = img_means.loc[img_id, 'model'] 
                     print(f"  Img {img_id}: H={h_val:.3f}, M={m_val:.3f}, Diff=+{diff_val:.3f}")
                     
-                print(f"{metric} - Images where HUMANS perform better:")
+                print(f"{metric} - Images where HUMANS do better:")
                 worst_imgs = diff.nsmallest(3)
                 for img_id, diff_val in worst_imgs.items():
                     h_val = img_means.loc[img_id, 'human']
@@ -771,7 +792,7 @@ class SaliencyEvaluator:
 
     def analyze_human_by_suffix(self, df_loso=None):
         """
-        Analyzes LOSO results for humans, calculating the average of the metric for each image and suffix.
+        Analyzes LOSO results for humans, computing the mean metric for each image and suffix.
         Only for human data.
         
         Args:
@@ -800,7 +821,7 @@ class SaliencyEvaluator:
         print("HUMAN ANALYSIS BY SUFFIX")
         print("="*60)
         
-        # Calculate average for each combination (img_id, suffix, metric)
+        # Compute mean for each combination (img_id, suffix, metric)
         human_img_means = []
         
         for img_id in human_data['img_id'].unique():
@@ -833,12 +854,12 @@ class SaliencyEvaluator:
                 if len(metric_data) > 0:
                     overall_mean = metric_data['mean'].mean()
                     overall_std = metric_data['mean'].std()
-                    print(f"{metric}: Average={overall_mean:.4f} ± {overall_std:.4f} (on {len(metric_data)} images)")
+                    print(f"{metric}: Mean={overall_mean:.4f} ± {overall_std:.4f} (over {len(metric_data)} images)")
         
         # Save results
         human_means_path = os.path.join(self.metrics_dir, 'human_means_by_suffix.csv')
         df_human_means.to_csv(human_means_path, index=False)
-        print(f"\nHuman results by suffix saved in: {human_means_path}")
+        print(f"\nHuman results by suffix saved to: {human_means_path}")
         
         # Also create a summary by suffix
         suffix_summary = []
@@ -860,20 +881,20 @@ class SaliencyEvaluator:
         df_suffix_summary = pd.DataFrame(suffix_summary)
         suffix_summary_path = os.path.join(self.metrics_dir, 'human_suffix_summary.csv')
         df_suffix_summary.to_csv(suffix_summary_path, index=False)
-        print(f"Summary by suffix saved in: {suffix_summary_path}")
+        print(f"Summary by suffix saved to: {suffix_summary_path}")
         
         return df_human_means, df_suffix_summary
 
     def wilcoxon_loso_vs_global(self, df_loso=None):
         """
-        Executes Wilcoxon tests to compare LOSO vs global metrics.
-        Aggregates data by image and then performs a SINGLE test for each metric and suffix.
+        Runs Wilcoxon tests to compare LOSO metrics vs global metrics.
+        Aggregates data by image and then does a SINGLE test for each metric and suffix.
         
         Args:
             df_loso: DataFrame with LOSO results (if None, loads from file)
             
         Returns:
-            DataFrame: Results of Wilcoxon tests
+            DataFrame: Wilcoxon test results
         """
         if df_loso is None:
             # Load LOSO data if not provided
@@ -893,7 +914,7 @@ class SaliencyEvaluator:
             return None
         
         print("\n" + "="*60)
-        print("WILCOXON TESTS: LOSO vs GLOBAL (AGGREGATED)")
+        print("WILCOXON TEST: LOSO vs GLOBAL (AGGREGATED)")
         print("="*60)
         
         wilcoxon_results = []
@@ -902,12 +923,12 @@ class SaliencyEvaluator:
         for suffix in df_loso['suffix'].unique():
             for metric in ['CC', 'KL', 'SIM']:
                 
-                # Aggregate LOSO data by image (average for each image)
+                # Aggregate LOSO data by image (mean for each image)
                 loso_agg = df_loso[(df_loso['suffix'] == suffix) & 
                                  (df_loso['source'] == 'human')].groupby('img_id')[metric].mean()
                 
                 # Aggregate global data by image (already aggregated, take the value)
-                # For 'full' suffix, compare with '5000' of synthetic ones
+                # For 'full' suffix, compare with '5000' of synthetics
                 global_suffix = '5000' if suffix == 'full' else suffix
                 global_agg = df_global[df_global['suffix'] == global_suffix].set_index('img_id')[metric]
                 
@@ -924,13 +945,13 @@ class SaliencyEvaluator:
                         from scipy.stats import wilcoxon
                         stat, p_value = wilcoxon(loso_values, global_values)
                         
-                        # Calculate descriptive statistics
+                        # Compute descriptive statistics
                         loso_mean = loso_values.mean()
                         loso_std = loso_values.std()
                         global_mean = global_values.mean()
                         global_std = global_values.std()
                         
-                        # Calculate effect size (Cohen's d)
+                        # Compute effect size (Cohen's d)
                         pooled_std = np.sqrt(((len(loso_values) - 1) * loso_std**2 + 
                                             (len(global_values) - 1) * global_std**2) / 
                                            (len(loso_values) + len(global_values) - 2))
@@ -961,7 +982,7 @@ class SaliencyEvaluator:
         df_wilcoxon = pd.DataFrame(wilcoxon_results)
         
         if len(df_wilcoxon) > 0:
-            # Apply FDR correction (False Discovery Rate)
+            # Apply FDR (False Discovery Rate) correction
             from statsmodels.stats.multitest import multipletests
             
             # Extract p-values
@@ -989,7 +1010,7 @@ class SaliencyEvaluator:
             # Save results
             wilcoxon_path = os.path.join(self.metrics_dir, 'wilcoxon_loso_vs_global.csv')
             df_wilcoxon.to_csv(wilcoxon_path, index=False)
-            print(f"\nWilcoxon results saved in: {wilcoxon_path}")
+            print(f"\nWilcoxon results saved to: {wilcoxon_path}")
             
             # Summary
             print("\nSUMMARY:")
@@ -1007,7 +1028,7 @@ class SaliencyEvaluator:
                       f"p_raw={row['p_value']:.4f} {row['significance_raw']}, "
                       f"p_fdr={row['p_corrected']:.4f} {row['significance_fdr']}")
             
-            # Show only significant results after FDR
+            # Show only significant results after FDR correction
             print("\nSIGNIFICANT RESULTS AFTER FDR CORRECTION:")
             significant_results = df_wilcoxon[df_wilcoxon['p_corrected'] < 0.05]
             if len(significant_results) > 0:
@@ -1030,10 +1051,10 @@ class SaliencyEvaluator:
         Layout identical to rm_analyzer.py with seaborn boxplot.
         
         Args:
-            save_plots: If True, saves plots as PNG files
+            save_plots: If True, saves the plots as PNG files
             
         Returns:
-            dict: Dictionary with created plots
+            dict: Dictionary with the created plots
         """
         # Load global data (model vs human average)
         global_path = os.path.join(self.metrics_dir, 'metrics_results.csv')
@@ -1044,7 +1065,7 @@ class SaliencyEvaluator:
             return None
         
         print("\n" + "="*60)
-        print("BOXPLOT CREATION: MODEL vs HUMAN AVERAGE")
+        print("CREATING BOXPLOTS: MODEL vs HUMAN AVERAGE")
         print("="*60)
         
         # Import matplotlib
@@ -1052,10 +1073,10 @@ class SaliencyEvaluator:
             import matplotlib.pyplot as plt
             import seaborn as sns
         except ImportError:
-            print("Error: matplotlib and seaborn are required for plots.")
+            print("Error: matplotlib and seaborn are required for plotting.")
             return None
         
-        # Configure style
+        # Set style
         plt.style.use('default')
         sns.set_palette("husl")
         
@@ -1082,7 +1103,7 @@ class SaliencyEvaluator:
             boxplot_data = []
             labels = []
             
-            # Sort suffixes in specific order: 500, 3000, 5000, full
+            # Order suffixes in the specific order: 500, 3000, 5000, full
             suffix_order = ['500', '3000', '5000', 'full']
             for suffix in suffix_order:
                 suffix_data = df_global[df_global['suffix'] == suffix]
@@ -1092,7 +1113,7 @@ class SaliencyEvaluator:
                     values = suffix_data[metric_name].values
                     boxplot_data.append(values)
                     labels.append(suffix)
-                    print(f"  Time window {suffix}ms: {len(values)} images, average={values.mean():.4f}±{values.std():.4f}")
+                    print(f"  Time window {suffix}ms: {len(values)} images, mean={values.mean():.4f}±{values.std():.4f}")
             
             if boxplot_data:
                 # Prepare long-form data for seaborn
@@ -1131,7 +1152,7 @@ class SaliencyEvaluator:
         if save_plots:
             plot_path = os.path.join(plots_dir, 'model_vs_human_boxplot.png')
             fig.savefig(plot_path, dpi=300, bbox_inches='tight')
-            print(f"  Plot saved in: {plot_path}")
+            print(f"  Plot saved to: {plot_path}")
         
         plt.show()
         
