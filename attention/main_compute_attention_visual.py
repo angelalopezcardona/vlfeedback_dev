@@ -1,5 +1,4 @@
 import os
-import os
 import sys
 cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(cwd)
@@ -11,7 +10,7 @@ sys.path.append(cwd)
 os.environ["PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT"] = "5.0"
 
 from utils.data_loader import ETDataLoader
-from attention.models.model_att import ModelAttentionExtractor
+from attention.models.model_visual_att import ModelVisualAttentionExtractor
 import argparse
 
 
@@ -37,6 +36,8 @@ if __name__ == "__main__":
     save_path= cwd + '/results/et/'
 
     responses, images, prompts, prompts_screenshots = ETDataLoader().load_data(raw_data_path=raw_data_path)
+    path_images = raw_data_path + "/images/"
+    images_trials_paths = {trial: path_images + "img_prompt_" + str(trial) + ".jpg" for trial, image in prompts.items()}
     words = ETDataLoader().load_texts_responses(raw_data_path=raw_data_path)
     responses_words  ={}
     prompts_words = {}
@@ -62,7 +63,15 @@ if __name__ == "__main__":
         word_level = True
 
         attention_trials = att_extractor.extract_attention(
-            responses_words, word_level=word_level
+            responses_words, word_level=word_level, images_trials_paths=images_trials_paths
         )
     
+        att_extractor.save_attention_df(
+            attention_trials,
+            texts_trials=responses_words,
+            path_folder=folder_path_attention,
+        )
+        
+        att_extractor.save_attention_np(attention_trials, folder_path_attention)
+        
         
