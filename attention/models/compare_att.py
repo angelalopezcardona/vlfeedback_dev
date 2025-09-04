@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from models.human_att import HumanAttentionExtractor
+from utils.data_loader import ETDataLoader
 from models.model_att import ModelAttentionExtractor
 from scipy.stats import spearmanr as spearmanr
 import pathlib
@@ -69,14 +70,12 @@ class CompareAttention:
     def compare_between_models_per_trials(
         folder,
         gaze_feature="fix_duration_n",
-        filter_completed=False,
     ):
-        folder_filter = "completed" if filter_completed else "not_filtered"
         if isinstance(folder, str):
             folder = pathlib.Path(folder)
         results_folder = "results"
         file_paths = list(folder.rglob("*"))
-        text = folder_filter + "/correlation_trials_" + str(gaze_feature) + ".csv"
+        text = "correlation_trials_" + str(gaze_feature) + ".csv"
         pattern = re.escape(text)
         data_models = {}
         counter = 1
@@ -95,7 +94,7 @@ class CompareAttention:
 
         # create row with the mean of all rows
         data_models = pd.DataFrame(data_models)
-        folder_to_save = str(folder) + "/" + results_folder + "/" + str(folder_filter)
+        folder_to_save = str(folder) + "/" + results_folder + "/"
         if not os.path.exists(folder_to_save):
             os.makedirs(folder_to_save)
         data_models.to_csv(
@@ -377,14 +376,12 @@ class CompareAttention:
         self,
         gaze_feature="fix_duration_n",
         save=True,
-        filter_completed=False,
         folder_attention="attention",
+        folder_filter="all",
     ):
-        folder_filter = "completed" if filter_completed else "not_filtered"
 
         sc_users_all, _ = self.compute_sc_all_userset(
             gaze_feature=gaze_feature,
-            filter_completed=filter_completed,
         )
         df = pd.DataFrame(sc_users_all).T
         df.rename(columns={df.columns[0]: "mean", df.columns[1]: "std"}, inplace=True)
@@ -517,44 +514,40 @@ class CompareAttention:
         folder_attention="attention",
     ):
         # Load the model
-        attention_trials, real_gaze_fixations, filter_trials = {}, {}, []
+        attention_trials, filter_trials = {}, []
         folder_path_attention = (
             self.path
             + str(folder_attention)
             + "/"
             + self.model_name.split("/")[1]
-            + "/"
         )
-        folder_fixations = (
-            self.path +  "/fixations/participant_" + str(1) + "_" + str(1) + "/session_1/"
-        )
+        cwd = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        folder_fixations = cwd + "/data/processed/et/agregated/"
         # load fixations of user and concat
-        real_gaze_fixations_user = HumanAttentionExtractor().load_gaze_features(
+        real_gaze_fixations = ETDataLoader().load_gaze_features(
             folder_fixations
         )
-        real_gaze_fixations = {**real_gaze_fixations_user, **real_gaze_fixations}
         # load attention of user and concat
         print(folder_path_attention)
-        attention_trials_user = ModelAttentionExtractor.load_attention_df(
+        attention_trials = ModelAttentionExtractor.load_attention_df(
             folder_path_attention
         )
-        attention_trials = {**attention_trials, **attention_trials_user}
 
         # -------------------------------------------
         # filter for the chosen and the rejected ones
-        if filter_cr == "chosen":
-            # remove all trials dont end with .1
-            filter_trials_user = [
-                trial for trial in filter_trials_user if str(trial).endswith(".1")
-            ]
-        elif filter_cr == "rejected":
-            # remove all trials dont end with .1
-            filter_trials_user = [
-                trial
-                for trial in filter_trials_user
-                if not str(trial).endswith(".1")
-            ]
-        filter_trials.extend(filter_trials_user)
+        # if filter_cr == "chosen":
+        #     # remove all trials dont end with .1
+        #     filter_trials_user = [
+        #         trial for trial in filter_trials_user if str(trial).endswith(".1")
+        #     ]
+        # elif filter_cr == "rejected":
+        #     # remove all trials dont end with .1
+        #     filter_trials_user = [
+        #         trial
+        #         for trial in filter_trials_user
+        #         if not str(trial).endswith(".1")
+        #     ]
+        # filter_trials.extend(filter_trials_user)
         # -------------------------------------------
 
         sc_layers, sc_layers_all = {}, {}
@@ -564,7 +557,7 @@ class CompareAttention:
                 attention_trials,
                 gaze_feature=gaze_feature,
                 layer=layer,
-                filter_trials=filter_trials,
+                filter_trials=[],
             )
             sc_layers[layer] = [mean_spearman, std_spearman]
             sc_layers_all[layer] = all_spearman
