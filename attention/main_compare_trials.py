@@ -43,8 +43,8 @@ if __name__ == "__main__":
         # -----------------------------------------------
         "meta-llama/Meta-Llama-3-8B": "causalLM",
         "meta-llama/Meta-Llama-3-8B-Instruct": "causalLM",
-        "meta-llama/Llama-3.1-8B": "causalLM",
-        "meta-llama/Llama-3.1-8B-Instruct": "causalLM",
+        # "meta-llama/Llama-3.1-8B": "causalLM",
+        # "meta-llama/Llama-3.1-8B-Instruct": "causalLM",
         #-----------------------------------------------
         # "microsoft/phi-1_5": "causalLM",
         # "openbmb/UltraRM-13b": "ultraRM",
@@ -60,37 +60,37 @@ if __name__ == "__main__":
     ]
     # compute per all
     # ----------------------------------------
-    # for gaze_feature in gaze_features:
-    #     for model_name, model_type in models.items():
-    #         print(model_name)
-    #         sc_users = CompareAttention(
-    #             model_name=model_name, model_type=model_type, path=path
-    #         ).compute_sc_model_per_trial(
-    #             gaze_feature=gaze_feature, filter_completed=filter_completed, folder_attention=folder_attention,
-    #         )
-    #     # compute results of all models
-    #     CompareAttention.compare_between_models_per_trials(
-    #         folder=path + folder_attention + "/",
-    #         gaze_feature=gaze_feature,
-    #         filter_completed=filter_completed,
-    #     )
-    # ----------------------------------------
-
-    # compute per chosen an rejected
-    # ----------------------------------------
     for gaze_feature in gaze_features:
-        # print(f"Compute per chosen and rejected for gaze feature:{gaze_feature}")
         for model_name, model_type in models.items():
             print(model_name)
             sc_users = CompareAttention(
                 model_name=model_name, model_type=model_type, path=path
-            ).compute_sc_model_chosenrejected_per_trials(
-                gaze_feature=gaze_feature,
-                folder_attention=folder_attention,
+            ).compute_sc_model_per_trial(
+                gaze_feature=gaze_feature, folder_attention=folder_attention,
             )
-        # # compute results of all models
-        CompareAttention.compare_between_models_chosenrejected_per_trials(
+        # compute results of all models
+        CompareAttention.compare_between_models_per_trials(
             folder=path + folder_attention + "/",
             gaze_feature=gaze_feature,
+
         )
+    # ----------------------------------------
+
+    # compute per chosen an rejected
+    # ----------------------------------------
+    # for gaze_feature in gaze_features:
+    #     # print(f"Compute per chosen and rejected for gaze feature:{gaze_feature}")
+    #     for model_name, model_type in models.items():
+    #         print(model_name)
+    #         sc_users = CompareAttention(
+    #             model_name=model_name, model_type=model_type, path=path
+    #         ).compute_sc_model_chosenrejected_per_trials(
+    #             gaze_feature=gaze_feature,
+    #             folder_attention=folder_attention,
+    #         )
+    #     # # compute results of all models
+    #     CompareAttention.compare_between_models_chosenrejected_per_trials(
+    #         folder=path + folder_attention + "/",
+    #         gaze_feature=gaze_feature,
+    #     )
     # ----------------------------------------

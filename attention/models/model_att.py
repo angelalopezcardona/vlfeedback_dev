@@ -441,7 +441,7 @@ class ModelAttentionExtractor:
     @staticmethod
     def load_attention_df(path_folder):
         attention_trials = {}
-        for trial in os.listdir(path_folder):
+        for trial in [d for d in os.listdir(path_folder) if os.path.isdir(os.path.join(path_folder, d)) and 'trial_' in d]:
             attention_layer = {}
             for layer in os.listdir(path_folder + "/" + trial):
                 attention = pd.read_csv(
