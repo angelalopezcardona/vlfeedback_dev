@@ -59,19 +59,12 @@ if __name__ == "__main__":
         )
        
         
-        att_extractor = ModelVisualAttentionExtractor(model_name, model_type)
+        att_extractor = ModelVisualAttentionExtractor(model_name, model_type, folder_path_attention)
         word_level = True
 
         attention_trials = att_extractor.extract_attention(
-            responses_words, word_level=word_level, images_trials_paths=images_trials_paths
+            prompts_words, word_level=word_level, images_trials_paths=images_trials_paths
         )
     
-        att_extractor.save_attention_df(
-            attention_trials,
-            texts_trials=responses_words,
-            path_folder=folder_path_attention,
-        )
-        
-        att_extractor.save_attention_np(attention_trials, folder_path_attention)
         
         

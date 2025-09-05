@@ -16,17 +16,16 @@ from transformers import (
 from attention.models.model_loader import ModelLoaderFactory
 
 
-class ModelAttentionExtractor:
-    def __init__(self, model_name, model_type):
-        self.model_type = model_type
-        model_loader = ModelLoaderFactory().get_model_loader(model_type)
-        self.model = model_loader.load_model(model_name)
-        self.tokenizer = model_loader.load_tokenizer(model_name)
+class ModelTextAttentionExtractor:
+    def __init__(self, model, tokenizer):
+
+        self.model = model
+        self.tokenizer = tokenizer
         print("tokenizer chat template")
         print(self.tokenizer.chat_template)
-        vocab = self.tokenizer.get_vocab()
+        self.vocab = self.tokenizer.get_vocab()
         self.special_tokens_id = [
-            vocab[token] for _, token in self.tokenizer.special_tokens_map.items()
+            self.vocab[token] for _, token in self.tokenizer.special_tokens_map.items()
         ]
 
     @staticmethod
@@ -110,19 +109,6 @@ class ModelAttentionExtractor:
         )
         return features_mapped_first_words
 
-    @staticmethod
-    def get_attention_model(model, inputs):
-        # check if model has atribute device
-        if not hasattr(model, "device"):
-            input_ids = inputs["input_ids"]
-            attention_mask = inputs["attention_mask"]
-        else:
-            input_ids = inputs["input_ids"].to(model.device)
-            attention_mask = inputs["attention_mask"].to(model.device)
-        output = model(input_ids=input_ids, attention_mask=attention_mask)
-        return output.attentions
-
-    # For the attention baseline, we fixed several experimental choices (see below) which might affect the results.
 
     def process_attention_reward(
         self,
@@ -176,7 +162,6 @@ class ModelAttentionExtractor:
         input_ids: BatchEncoding,
         text: str = None,
         list_word_original: list = None,
-        word_level: bool = True,
         method="sum",
     ):
         attention_layer = {}
@@ -190,110 +175,54 @@ class ModelAttentionExtractor:
             if method == "sum":
                 aggregated_attention = np.sum(mean_attention, axis=0)
             else:
-                if self.model_type == "BertBased":
-                    aggregated_attention = np.mean(mean_attention, axis=0)
-                else:
-                    # we normalize the attention taking into account the decoder nature and the masking
-                    # mean_attention_scaled_decoder = self.normalize_rows(mean_attention)
-                    # we dont want to include the ceros because of masking
-                    aggregated_attention = self.compute_mean_diagonalbewlow(
-                        mean_attention
-                    )
-
-            if word_level is True:
-                if list_word_original is None:
-                    raise ValueError(
-                        "list_word_original must be provided when word_level is True"
-                    )
-                if text is None:
-                    raise ValueError("text must be provided when word_level is True")
-                aggregated_attention = [
-                    0 if i in special_token_idx else aggregated_attention[i]
-                    for i in range(len(aggregated_attention))
-                ]
-                aggregated_attention_mapped_words = (
-                    FixationsAligner().map_features_from_tokens_to_words(
-                        aggregated_attention, input_ids, mode="sum"
-                    )
+                aggregated_attention = self.compute_mean_diagonalbewlow(
+                    mean_attention
                 )
-                if aggregated_attention_mapped_words is None:
-                    aggregated_attention = self.map_attention_from_tokens_to_words_v2(
-                        list_word_original,
-                        text,
-                        input_ids,
-                        features_mapped_second_words=aggregated_attention,
-                        mode="mean",
-                    )
-                else:
-                    aggregated_attention = self.map_attention_from_words_to_words(
-                        list_word_original,
-                        text,
-                        input_ids,
-                        aggregated_attention_mapped_words,
-                        mode="mean",
-                    )
-
+            if list_word_original is None:
+                raise ValueError(
+                    "list_word_original must be provided when word_level is True"
+                )
+            if text is None:
+                raise ValueError("text must be provided when word_level is True")
+            aggregated_attention = [
+                0 if i in special_token_idx else aggregated_attention[i]
+                for i in range(len(aggregated_attention))
+            ]
+            aggregated_attention_mapped_words = (
+                FixationsAligner().map_features_from_tokens_to_words(
+                    aggregated_attention, input_ids, mode="sum"
+                )
+            )
+            if aggregated_attention_mapped_words is None:
+                aggregated_attention = self.map_attention_from_tokens_to_words_v2(
+                    list_word_original,
+                    text,
+                    input_ids,
+                    features_mapped_second_words=aggregated_attention,
+                    mode="mean",
+                )
             else:
-                # to compute attention per token we remove special tokens
-                aggregated_attention = np.delete(
-                    aggregated_attention, special_token_idx
+                aggregated_attention = self.map_attention_from_words_to_words(
+                    list_word_original,
+                    text,
+                    input_ids,
+                    aggregated_attention_mapped_words,
+                    mode="mean",
                 )
+
+
             relative_attention = scipy.special.softmax(aggregated_attention)
             # relative_attention = aggregated_attention
             attention_layer[layer] = relative_attention
         return attention_layer
 
-    def extract_attention(self, texts_trials: dict, word_level: bool = True):
-        attention_trials = {}
-        for trial, list_text in texts_trials.items():
-            if not '.' in str(trial):
-                continue
-            print("trial", trial)
-            list_word_original = [str(x) for x in list_text]
-            text = " ".join(list_word_original)
-            list_word_original = [x.lower() for x in list_word_original]
-            input_ids = self.tokenize_text(self.tokenizer, text)
-            attention = self.get_attention_model(self.model, input_ids)
-            # try:
-            attention_trials[trial] = self.process_attention(
-                attention,
-                input_ids,
-                text=text,
-                list_word_original=list_word_original,
-                word_level=word_level,
-            )
-            # except Exception as e:
-            #     print(trial, "error:", e)
-        return attention_trials
 
-    @staticmethod
-    def tokenize_text_chat(tokenizer, prompt, response, model_type="ULTRA"):
-        if model_type == "ultraRM":
-            text = "Human: " + prompt + "\nAssistant: " + response
-        elif model_type == "QRLlama":
-            messages = [
-                {"role": "user", "content": prompt},
-                {"role": "assistant", "content": response},
-            ]
-            tokens = tokenizer.apply_chat_template(
-                messages, return_tensors="pt", return_offsets_mapping=True
-            )
-            text = tokenizer.decode(tokens[0])
-        elif model_type == "eurus":
-            text = "[INST] " + prompt + " [/INST] " + response
-        else:
-            return None
 
-        return text
+
 
     @staticmethod
     def find_last_consecutive_pair(nums, tokenizer, model_type):
-        # def find_last_consecutive_pair_qrllama(nums, num0=128006, num1=78191, num2=128007):
-        #     last_index = -1  # Initialize to -1 to indicate no pair found yet
-        #     for i in range(len(nums) - 1):
-        #         if nums[i] == num0 and nums[i + 1] == num1 and nums[i + 2] == num2:
-        #             last_index = i + 2  # Update last_index to the current index
-        #     return last_index
+
 
         def find_sequence_last_index(lst, sequence):
             n = len(sequence)
@@ -394,16 +323,6 @@ class ModelAttentionExtractor:
         return special_token_idx
 
 
-    @staticmethod
-    def tokenize_text(tokenizer, text):
-        return tokenizer(
-            text,
-            return_tensors="pt",
-            add_special_tokens=True,
-            padding=False,
-            truncation=False,
-            return_offsets_mapping=True,
-        )
 
     @staticmethod
     def save_attention_np(attention_trials, path_folder):
