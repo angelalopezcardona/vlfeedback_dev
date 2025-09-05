@@ -17,18 +17,23 @@ from attention.models.model_loader import ModelLoaderFactory
 
 
 class ModelAttentionExtractor:
-    def __init__(self, model_name, model_type):
-        self.model_type = model_type
-        model_loader = ModelLoaderFactory().get_model_loader(model_type)
-        self.model = model_loader.load_model(model_name)
-        self.tokenizer = model_loader.load_tokenizer(model_name)
+    def __init__(self, model, tokenizer):
+        self.model = model
+        self.tokenizer = tokenizer
         print("tokenizer chat template")
         print(self.tokenizer.chat_template)
-        vocab = self.tokenizer.get_vocab()
+        self.vocab = self.tokenizer.get_vocab()
         self.special_tokens_id = [
-            vocab[token] for _, token in self.tokenizer.special_tokens_map.items()
+            self.vocab[token] for _, token in self.tokenizer.special_tokens_map.items()
         ]
 
+    @classmethod
+    def from_model_name(cls, model_name, model_type):
+        model_loader = ModelLoaderFactory().get_model_loader(model_type)
+        model = model_loader.load_model(model_name)
+        tokenizer = model_loader.load_tokenizer(model_name)
+        return cls(model, tokenizer)
+    
     @staticmethod
     def map_attention_from_tokens_to_words_v2(
         list_words_first: list,
@@ -211,27 +216,7 @@ class ModelAttentionExtractor:
                     0 if i in special_token_idx else aggregated_attention[i]
                     for i in range(len(aggregated_attention))
                 ]
-                aggregated_attention_mapped_words = (
-                    FixationsAligner().map_features_from_tokens_to_words(
-                        aggregated_attention, input_ids, mode="sum"
-                    )
-                )
-                if aggregated_attention_mapped_words is None:
-                    aggregated_attention = self.map_attention_from_tokens_to_words_v2(
-                        list_word_original,
-                        text,
-                        input_ids,
-                        features_mapped_second_words=aggregated_attention,
-                        mode="mean",
-                    )
-                else:
-                    aggregated_attention = self.map_attention_from_words_to_words(
-                        list_word_original,
-                        text,
-                        input_ids,
-                        aggregated_attention_mapped_words,
-                        mode="mean",
-                    )
+                aggregated_attention = self._aggregate_attention_words(aggregated_attention, input_ids, list_word_original, text)
 
             else:
                 # to compute attention per token we remove special tokens
@@ -242,6 +227,31 @@ class ModelAttentionExtractor:
             # relative_attention = aggregated_attention
             attention_layer[layer] = relative_attention
         return attention_layer
+
+
+    def _aggregate_attention_words(self, aggregated_attention, input_ids, list_word_original, text):
+        aggregated_attention_mapped_words = (
+            FixationsAligner().map_features_from_tokens_to_words(
+                aggregated_attention, input_ids, mode="sum"
+            )
+        )
+        if aggregated_attention_mapped_words is None:
+            aggregated_attention = self.map_attention_from_tokens_to_words_v2(
+                list_word_original,
+                text,
+                input_ids,
+                features_mapped_second_words=aggregated_attention,
+                mode="mean",
+            )
+        else:
+            aggregated_attention = self.map_attention_from_words_to_words(
+                list_word_original,
+                text,
+                input_ids,
+                aggregated_attention_mapped_words,
+                mode="mean",
+            )
+        return aggregated_attention
 
     def extract_attention(self, texts_trials: dict, word_level: bool = True):
         attention_trials = {}

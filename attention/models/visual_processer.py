@@ -6,6 +6,13 @@ from typing import Dict, Tuple
 from PIL import Image
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+import numpy as np
+from typing import Dict, Tuple, Optional
+from PIL import Image
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+from matplotlib import cm
+
 class ImageProcessor:
     
     @staticmethod
@@ -249,6 +256,8 @@ class ImageProcessor:
         """
         offset = 1 if has_cls else 0
         block = seq_attn[start + offset : start + offset + gh * gw]
+        if isinstance(block, list):
+            block = np.array(block)
         if block.size != gh * gw:
             raise ValueError("Attention segment does not match grid size.")
         heat = block.reshape(gh, gw)
@@ -304,6 +313,7 @@ class ImageProcessor:
         h_arr = np.asarray(h_img).astype(np.float32) / 255.0  # [0,1]
 
         # --- colorize heat ---
+        from matplotlib import cm
         cmap = cm.get_cmap(cmap_name)
         heat_rgba = (cmap(h_arr) * 255).astype(np.uint8)      # HxWx4
         heat_rgb = heat_rgba[..., :3].astype(np.float32)
@@ -314,3 +324,131 @@ class ImageProcessor:
 
         Image.fromarray(overlay).save(out_path, dpi=(dpi, dpi))
         return out_path
+
+
+    def save_attention_overlay_with_grid(
+        self,
+        image_path: str,
+        heat: np.ndarray,                    # (gh, gw) attention over patches
+        info: Dict[str, object],             # expects keys: 'processed_size' -> (H, W), 'grid' -> (gh, gw), 'patch_size' -> p
+        save_folder: str,
+        image_name: str,
+        # overlay options
+        cmap_name: str = "viridis",
+        alpha: float = 0.45,
+        dpi: int = 200,
+        # grid options
+        draw_all_patches: bool = True,
+        grid_edgecolor: str = "orange",
+        grid_linewidth: float = 0.6,
+        annotate: bool = False,
+        fontsize: int = 6,
+        # top-k options
+        draw_topk: bool = True,
+        topk: int = 10,
+        topk_color: str = "red",
+        topk_linewidth: float = 2.0,
+        # extra debug
+        save_boxes_only: bool = True,
+    ) -> Dict[str, str]:
+        """
+        Creates:
+        - overlay image with heat + optional full grid + optional Top-K boxes
+        - (optional) boxes-only debug over resized original
+
+        Returns dict with saved paths.
+        """
+        os.makedirs(save_folder, exist_ok=True)
+        root, ext = os.path.splitext(image_name)
+        if ext == "":
+            image_name = root + ".png"
+        overlay_path = os.path.join(save_folder, image_name)
+        boxes_only_path = os.path.join(save_folder, f"{root}_topk_boxes.png")
+
+        # --- sizes & checks ---
+        H, W = info["processed_size"]          # (height, width)
+        gh, gw = info["grid"]
+        p = info["patch_size"]
+        if heat.shape != (gh, gw):
+            raise ValueError(f"heat shape {heat.shape} != grid {(gh, gw)}")
+
+        # --- load & resize base image ---
+        img = Image.open(image_path).convert("RGB").resize((W, H), resample=Image.BILINEAR)
+        img_np = np.array(img).astype(np.float32)  # HxWx3
+
+        # --- normalize heat to [0,1] ---
+        h = heat.astype(np.float32)
+        h_min, h_max = float(np.nanmin(h)), float(np.nanmax(h))
+        h = (h - h_min) / (h_max - h_min) if (h_max - h_min) > 1e-12 else np.zeros_like(h, dtype=np.float32)
+
+        # --- upsample heat to image size (stay float) ---
+        h_up = np.array(Image.fromarray(h).resize((W, H), resample=Image.BILINEAR), dtype=np.float32)
+        h_up = np.clip(h_up, 0.0, 1.0)
+
+        # --- colorize + blend ---
+        heat_rgb = (cm.get_cmap(cmap_name)(h_up)[..., :3] * 255.0).astype(np.float32)
+        overlay_np = np.clip((1.0 - alpha) * img_np + alpha * heat_rgb, 0, 255).astype(np.uint8)
+
+        # helper to draw grid & top-k using matplotlib (cleanest for annotations)
+        def draw_fig(base_rgb: np.ndarray, draw_grid: bool, draw_k: bool, save_path: str):
+            fig_w, fig_h = W / 100.0, H / 100.0
+            fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
+            ax.imshow(base_rgb)
+            ax.set_axis_off()
+
+            # Grid of all patches (row-major). Uses `p` for rectangle size.
+            if draw_grid:
+                for r in range(gh):
+                    for c in range(gw):
+                        left = c * p
+                        top  = r * p
+                        rect = Rectangle(
+                            (left, top), p, p,
+                            linewidth=grid_linewidth,
+                            edgecolor=grid_edgecolor,
+                            facecolor="none"
+                        )
+                        ax.add_patch(rect)
+                        if annotate:
+                            ax.text(
+                                left + 2, top + 10,
+                                f"{r},{c}",
+                                fontsize=fontsize,
+                                color=grid_edgecolor,
+                                ha="left", va="top",
+                                bbox=dict(facecolor="black", alpha=0.2, pad=0.3)
+                            )
+
+            # Top-K boxes based on heat grid (robust to non-multiple sizes via linspace)
+            if draw_k and topk > 0:
+                flat = h.ravel()
+                k = min(topk, flat.size)
+                idxs = np.argsort(flat)[::-1][:k]
+                y_edges = np.linspace(0, H, gh + 1, dtype=int)
+                x_edges = np.linspace(0, W, gw + 1, dtype=int)
+                for idx in idxs:
+                    r, c = divmod(idx, gw)
+                    x0, x1 = x_edges[c], x_edges[c + 1]
+                    y0, y1 = y_edges[r], y_edges[r + 1]
+                    rect = Rectangle(
+                        (x0, y0), x1 - x0, y1 - y0,
+                        linewidth=topk_linewidth, edgecolor=topk_color, facecolor="none"
+                    )
+                    ax.add_patch(rect)
+
+            plt.tight_layout(pad=0)
+            fig.savefig(save_path, bbox_inches="tight", pad_inches=0)
+            plt.close(fig)
+
+        # 1) Save overlay (with grid + top-k if requested)
+        draw_fig(overlay_np, draw_grid=draw_all_patches, draw_k=draw_topk, save_path=overlay_path)
+
+        # 2) Optional: boxes-only debug over the resized original
+        if save_boxes_only:
+            draw_fig(img_np.astype(np.uint8), draw_grid=draw_all_patches, draw_k=draw_topk, save_path=boxes_only_path)
+
+        out = {"overlay": overlay_path}
+        if save_boxes_only:
+            out["boxes_only"] = boxes_only_path
+        return out
+

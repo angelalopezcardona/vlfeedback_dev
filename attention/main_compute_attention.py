@@ -83,7 +83,7 @@ if __name__ == "__main__":
                 + "/"
             )
         
-        att_extractor = ModelAttentionExtractor(model_name, model_type)
+        att_extractor = ModelAttentionExtractor.from_model_name(model_name, model_type)
         word_level = True
         if reward is False:
             attention_trials = att_extractor.extract_attention(
