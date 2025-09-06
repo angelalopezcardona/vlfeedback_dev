@@ -78,3 +78,4 @@ with torch.inference_mode():
 resp = outputs.sequences[0]
 print(tokenizer.decode(resp))
 print(outputs.attentions[0][0].shape)
+## should be input_ids length + 255 approx
