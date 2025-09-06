@@ -20,8 +20,6 @@ class ModelAttentionExtractor:
     def __init__(self, model, tokenizer):
         self.model = model
         self.tokenizer = tokenizer
-        print("tokenizer chat template")
-        print(self.tokenizer.chat_template)
         self.vocab = self.tokenizer.get_vocab()
         self.special_tokens_id = [
             self.vocab[token] for _, token in self.tokenizer.special_tokens_map.items()
