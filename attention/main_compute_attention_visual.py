@@ -17,13 +17,7 @@ import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument(
-        "--reward",
-        default=False,
-    )
     args = parser.parse_args()
-    reward = str(args.reward).lower() == "true"
-    print(f"Reward variable:{reward, type(reward)}")
 
     models = {
         # -----------------------------------------------
@@ -53,19 +47,19 @@ if __name__ == "__main__":
 
         folder_path_attention = (
             save_path
-            + "attention/"
+            + "attention_rollout/"
             + model_name.split("/")[1]
             + "/"
         )
        
         
         att_extractor = ModelVisualAttentionExtractor(model_name, model_type, folder_path_attention)
-        word_level = True
-
+        prompts_words_subset = {'14': prompts_words['14']}
         attention_trials_image, attention_trials_text, info = att_extractor.extract_attention(
-            prompts_words, images_trials_paths=images_trials_paths
+            prompts_words_subset, images_trials_paths=images_trials_paths,
+            attention_method='rollout'
         )
-    
+
         att_extractor.save_attention_trials_image(images_trials_paths, attention_trials_image, info, folder_path_attention + "saliency/")
         att_extractor.save_attention_df(attention_trials_text, prompts_words, folder_path_attention)
         
