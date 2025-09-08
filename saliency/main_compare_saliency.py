@@ -12,12 +12,16 @@ cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(cwd)
 
  # Define model names and their corresponding data
-model_names = ['Visalformer', 'MDSEM-500', 'MDSEM-3000', 'MDSEM-5000']
+model_names = ['Visalformer', 'MDSEM-500', 'MDSEM-3000', 'MDSEM-5000', 'LLaVA-7B-mean', 'LLaVA-7B-max', 'LLaVA-13B-mean', 'LLaVA-13B-max']
 model_data_keys = [
     ('visalformer', None),
     ('mdsem', '500'),
     ('mdsem', '3000'),
-    ('mdsem', '5000')
+    ('mdsem', '5000'),
+    ('llava7b', 'rollout_mean'),
+    ('llava7b', 'rollout_max'),
+    ('llava13b', 'rollout_mean'),
+    ('llava13b', 'rollout_max')
 ]
     
 def compute_descriptive_statistics(metrics_saliency, print_table=True):
@@ -92,8 +96,69 @@ def compute_descriptive_statistics(metrics_saliency, print_table=True):
     descriptive_df = pd.DataFrame(descriptive_data)
     descriptive_df.to_csv(os.path.join(results_path_saliency, 'descriptive_metrics_5groups.csv'), index=False)
     if print_table:
-        latex_table = generate_latex_table2(metrics_saliency)
+        latex_table = generate_latex_table2()
         print(latex_table)
+
+    # Split descriptive stats into attention vs saliency models
+    attention_specs = [
+        ('LLaVA-7B-mean', ('llava7b', 'rollout_mean')),
+        ('LLaVA-7B-max', ('llava7b', 'rollout_max')),
+        ('LLaVA-13B-mean', ('llava13b', 'rollout_mean')),
+        ('LLaVA-13B-max', ('llava13b', 'rollout_max')),
+    ]
+    saliency_specs = [
+        ('Visalformer', ('visalformer', None)),
+        ('MDSEM-500', ('mdsem', '500')),
+        ('MDSEM-3000', ('mdsem', '3000')),
+        ('MDSEM-5000', ('mdsem', '5000')),
+    ]
+
+    def build_desc_rows(specs):
+        rows = []
+        for display_name, (main_key, sub_key) in specs:
+            model_metrics = metrics_saliency[main_key] if sub_key is None else metrics_saliency[main_key][sub_key]
+            rows.append({
+                'Group': display_name,
+                'SC_mean': float(np.mean(model_metrics['SC'])),
+                'SC_std': float(np.std(model_metrics['SC'])),
+                'SE_mean': float(np.mean(model_metrics['SE'])),
+                'SE_std': float(np.std(model_metrics['SE'])),
+            })
+        return rows
+
+    pd.DataFrame(build_desc_rows(attention_specs)).to_csv(
+        os.path.join(results_path_saliency, 'descriptive_metrics_attention.csv'), index=False)
+    pd.DataFrame(build_desc_rows(saliency_specs)).to_csv(
+        os.path.join(results_path_saliency, 'descriptive_metrics_saliency_models.csv'), index=False)
+
+    # Generate LaTeX tables for split descriptive statistics
+    if print_table:
+        def generate_desc_latex(specs, caption):
+            latex_table = "\\begin{table}[htbp]\n"
+            latex_table += "\\centering\n"
+            latex_table += f"\\caption{{{caption}}}\n"
+            latex_table += "\\label{tab:descriptive_stats_split}\n"
+            latex_table += "\\begin{tabular}{l|cc}\n"
+            latex_table += "\\hline\n"
+            latex_table += "Group & SC & SE \\\\\n"
+            latex_table += "\\hline\n"
+            
+            for display_name, (main_key, sub_key) in specs:
+                model_metrics = metrics_saliency[main_key] if sub_key is None else metrics_saliency[main_key][sub_key]
+                sc_mean = np.mean(model_metrics["SC"])
+                sc_std = np.std(model_metrics["SC"])
+                se_mean = np.mean(model_metrics["SE"])
+                se_std = np.std(model_metrics["SE"])
+                latex_table += f"{display_name} & {sc_mean:.3f} $\\pm$ {sc_std:.3f} & {se_mean:.3f} $\\pm$ {se_std:.3f} \\\\\n"
+            
+            latex_table += "\\hline\n"
+            latex_table += "\\end{tabular}\n"
+            latex_table += "\\end{table}\n"
+            return latex_table
+        
+        print(generate_desc_latex(attention_specs, 'Descriptive Statistics (Attention Models: LLaVA)'))
+        print(generate_desc_latex(saliency_specs, 'Descriptive Statistics (Saliency Models: Visalformer + MDSEM)'))
+
     return True
     
     
@@ -153,6 +218,66 @@ def compute_table_metrics(metrics_subjects, print_table=True):
         print(latex_table)
     return True
 
+def compute_table_metrics_split(metrics_subjects, print_table=True):
+    """Create and save separate comparison tables for attention (LLaVA) and saliency (Visalformer+MDSEM) models."""
+    # Define model groups: (display_name, (main_key, sub_key))
+    attention_models = [
+        ('LLaVA-7B-mean', ('llava7b', 'rollout_mean')),
+        ('LLaVA-7B-max', ('llava7b', 'rollout_max')),
+        ('LLaVA-13B-mean', ('llava13b', 'rollout_mean')),
+        ('LLaVA-13B-max', ('llava13b', 'rollout_max')),
+    ]
+    saliency_models = [
+        ('Visalformer', ('visalformer', None)),
+        ('MDSEM-500', ('mdsem', '500')),
+        ('MDSEM-3000', ('mdsem', '3000')),
+        ('MDSEM-5000', ('mdsem', '5000')),
+    ]
+
+    def build_df(model_specs):
+        rows = []
+        for display_name, (main_key, sub_key) in model_specs:
+            model_metrics = metrics_subjects[main_key] if sub_key is None else metrics_subjects[main_key][sub_key]
+            row = {'Model': display_name}
+            for metric in ['sim', 'auc', 'nss', 'kld', 'cc']:
+                row[f'{metric.upper()}_mean'] = float(np.mean(model_metrics[metric]))
+                row[f'{metric.upper()}_std'] = float(np.std(model_metrics[metric]))
+            rows.append(row)
+        return pd.DataFrame(rows)
+
+    def to_latex(model_specs, caption):
+        latex_table = "\\begin{table}[htbp]\n"
+        latex_table += "\\centering\n"
+        latex_table += f"\\caption{{{caption}}}\n"
+        latex_table += "\\label{tab:comparison_metrics_split}\n"
+        latex_table += "\\begin{tabular}{l|ccccc}\n"
+        latex_table += "\\hline\n"
+        latex_table += "Model & SIM & AUC & NSS & KLD & CC \\\n"
+        latex_table += "\\hline\n"
+        for display_name, (main_key, sub_key) in model_specs:
+            model_metrics = metrics_subjects[main_key] if sub_key is None else metrics_subjects[main_key][sub_key]
+            row = f"{display_name}"
+            for metric in ['sim', 'auc', 'nss', 'kld', 'cc']:
+                mean_val = np.mean(model_metrics[metric])
+                std_val = np.std(model_metrics[metric])
+                row += f" & {mean_val:.3f} $\\pm$ {std_val:.3f}"
+            row += " \\\n"
+            latex_table += row
+        latex_table += "\\hline\n"
+        latex_table += "\\end{tabular}\n"
+        latex_table += "\\end{table}\n"
+        return latex_table
+
+    attn_df = build_df(attention_models)
+    sal_df = build_df(saliency_models)
+    attn_df.to_csv(os.path.join(results_path_saliency, 'comparison_metrics_attention.csv'), index=False)
+    sal_df.to_csv(os.path.join(results_path_saliency, 'comparison_metrics_saliency_models.csv'), index=False)
+
+    if print_table:
+        print(to_latex(attention_models, 'Comparison Metrics (Attention Models: LLaVA)'))
+        print(to_latex(saliency_models, 'Comparison Metrics (Saliency Models: Visalformer + MDSEM)'))
+    return True
+
 def compute_saliency_metrics(model_saliency, human_sal, human_fixations):
     """
     Compute metrics between model and human saliency maps
@@ -184,11 +309,26 @@ def compute_saliency_metrics(model_saliency, human_sal, human_fixations):
     # Create fixation map from fixation coordinates
     fixation_map = create_fixation_map(human_fixations, human_sal.shape)
     fixation_tensor = torch.from_numpy(fixation_map).float()
-    
+    if model_tensor.dim() == 2:
+        model_tensor = model_tensor.unsqueeze(0).unsqueeze(0)   # (H,W) -> (1,1,H,W)
+    elif model_tensor.dim() == 3:
+        model_tensor = model_tensor.unsqueeze(1)                 # (B,H,W) -> (B,1,H,W)
+
+    if human_sal_tensor.dim() == 2:
+        human_sal_tensor = human_sal_tensor.unsqueeze(0).unsqueeze(0)
+    elif human_sal_tensor.dim() == 3:
+        human_sal_tensor = human_sal_tensor.unsqueeze(1)
+    if fixation_tensor.dim() == 2:
+        fixation_tensor = fixation_tensor.unsqueeze(0).unsqueeze(0)
+    elif fixation_tensor.dim() == 3:
+        fixation_tensor = fixation_tensor.unsqueeze(1)
+    auc = compute_auc(model_tensor, fixation_tensor)
+    auc = auc if isinstance(auc, torch.Tensor) else torch.tensor(auc, dtype=torch.float32)
+
     # Compute metrics
     metrics = {
         'sim': compute_sim(model_tensor, human_sal_tensor).item(),
-        'auc': compute_auc(model_tensor, fixation_tensor).item(),
+        'auc': auc.item(),
         'nss': compute_nss(model_tensor, fixation_tensor).item(),
         'kld': compute_kl(model_tensor, human_sal_tensor).item(),
         'cc': compute_cc(model_tensor, human_sal_tensor).item()
@@ -225,8 +365,8 @@ def create_fixation_map(fixations, image_shape):
     return fixation_map
 
 if __name__ == "__main__":
-    subjects = [1,2,3,4,5,6,7,8,9,10]
-    cwd = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    subjects = [1,2,3,4,5,6,7,8,9,10,11,12,14,15]
+    cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     raw_data_path = cwd + "/data/raw/et"
     process_data_path = cwd + "/data/processed/et"
     save_path= cwd + '/results/et/'
@@ -239,25 +379,42 @@ if __name__ == "__main__":
 
     results_path_saliency = save_path + '/visalformer/saliency'
     results_path_saliency_mdsem = save_path + '/mdsem/salmaps_arrays'
+    results_path_llava7b = cwd + '/attention_saliency/llava7b_attention'
+    results_path_llava13b = cwd + '/attention_saliency/llava13b_attention'
     metrics_subjects = {
         "visalformer" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []},
         "mdsem" : {
             "500" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}, 
             "3000" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}, 
             "5000" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}
+        },
+        "llava7b" : {
+            "rollout_mean" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []},
+            "rollout_max" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}
+        },
+        "llava13b" : {
+            "rollout_mean" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []},
+            "rollout_max" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}
         }
     }
       
     metrics_saliency = {
         "subject" : {"SC" : [], "SE" : []}, 
         "visalformer" : {"SC": [], "SE" : []}, 
-        "mdsem" : {"500" : {"SC" : [], "SE" : []}, '3000' : {"SC" : [], "SE" : []}, '5000' : {"SC" : [], "SE" : []}}}
+        "mdsem" : {"500" : {"SC" : [], "SE" : []}, '3000' : {"SC" : [], "SE" : []}, '5000' : {"SC" : [], "SE" : []}},
+        "llava7b" : {"rollout_mean" : {"SC" : [], "SE" : []}, "rollout_max" : {"SC" : [], "SE" : []}},
+        "llava13b" : {"rollout_mean" : {"SC" : [], "SE" : []}, "rollout_max" : {"SC" : [], "SE" : []}}
+    }
     for prompt_number, _ in prompts.items():
         box_image = ETDataLoader().find_image_in_screenshot(prompts_screenshots[prompt_number], images[prompt_number], draw_result=False)
         saliency_map_visalformer = np.load(results_path_saliency + '/saliency_trial_{}.npy'.format(prompt_number))
         saliency_map_mdsem_05 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_500.npy'.format(prompt_number))
-        saliency_map_mdsem_3 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_5000.npy'.format(prompt_number))
+        saliency_map_mdsem_3 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_3000.npy'.format(prompt_number))
         saliency_map_mdsem_5 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_5000.npy'.format(prompt_number))
+        saliency_map_llava7b_mean = np.load(results_path_llava7b + '/img_prompt_{}_rollout_mean.npy'.format(prompt_number))
+        saliency_map_llava7b_max = np.load(results_path_llava7b + '/img_prompt_{}_rollout_max.npy'.format(prompt_number))
+        saliency_map_llava13b_mean = np.load(results_path_llava13b + '/img_prompt_{}_rollout_mean.npy'.format(prompt_number))
+        saliency_map_llava13b_max = np.load(results_path_llava13b + '/img_prompt_{}_rollout_max.npy'.format(prompt_number))
         saliency_coverage_visalformer = saliency_generator.compute_saliency_coverage(saliency_map_visalformer)
         saliency_entropy_visalformer = saliency_generator.compute_shannon_entropy(saliency_map_visalformer)
         metrics_saliency["visalformer"]['SC'].append(saliency_coverage_visalformer)
@@ -274,6 +431,28 @@ if __name__ == "__main__":
         saliency_entropy_mdsem_5 = saliency_generator.compute_shannon_entropy(saliency_map_mdsem_5)
         metrics_saliency["mdsem"]["5000"]["SC"].append(saliency_coverage_mdsem_5)
         metrics_saliency["mdsem"]["5000"]["SE"].append(saliency_entropy_mdsem_5)
+        
+        # LLaVA 7B computations
+        saliency_coverage_llava7b_mean = saliency_generator.compute_saliency_coverage(saliency_map_llava7b_mean)
+        saliency_entropy_llava7b_mean = saliency_generator.compute_shannon_entropy(saliency_map_llava7b_mean)
+        metrics_saliency["llava7b"]["rollout_mean"]["SC"].append(saliency_coverage_llava7b_mean)
+        metrics_saliency["llava7b"]["rollout_mean"]["SE"].append(saliency_entropy_llava7b_mean)
+        
+        saliency_coverage_llava7b_max = saliency_generator.compute_saliency_coverage(saliency_map_llava7b_max)
+        saliency_entropy_llava7b_max = saliency_generator.compute_shannon_entropy(saliency_map_llava7b_max)
+        metrics_saliency["llava7b"]["rollout_max"]["SC"].append(saliency_coverage_llava7b_max)
+        metrics_saliency["llava7b"]["rollout_max"]["SE"].append(saliency_entropy_llava7b_max)
+        
+        # LLaVA 13B computations
+        saliency_coverage_llava13b_mean = saliency_generator.compute_saliency_coverage(saliency_map_llava13b_mean)
+        saliency_entropy_llava13b_mean = saliency_generator.compute_shannon_entropy(saliency_map_llava13b_mean)
+        metrics_saliency["llava13b"]["rollout_mean"]["SC"].append(saliency_coverage_llava13b_mean)
+        metrics_saliency["llava13b"]["rollout_mean"]["SE"].append(saliency_entropy_llava13b_mean)
+        
+        saliency_coverage_llava13b_max = saliency_generator.compute_saliency_coverage(saliency_map_llava13b_max)
+        saliency_entropy_llava13b_max = saliency_generator.compute_shannon_entropy(saliency_map_llava13b_max)
+        metrics_saliency["llava13b"]["rollout_max"]["SC"].append(saliency_coverage_llava13b_max)
+        metrics_saliency["llava13b"]["rollout_max"]["SE"].append(saliency_entropy_llava13b_max)
         
         for subject, saliency_maps in subject_saliency.items():
             fixations_trial = subject_fixations[subject]
@@ -310,10 +489,41 @@ if __name__ == "__main__":
             metrics_subjects["mdsem"]["5000"]["nss"].append(metrics['nss'])
             metrics_subjects["mdsem"]["5000"]["kld"].append(metrics['kld'])
             metrics_subjects["mdsem"]["5000"]["cc"].append(metrics['cc'])
+            
+            # LLaVA 7B comparison metrics
+            metrics = compute_saliency_metrics(saliency_map_llava7b_mean, saliency_map_trial, fixations_trial)
+            metrics_subjects["llava7b"]["rollout_mean"]["sim"].append(metrics['sim'])
+            metrics_subjects["llava7b"]["rollout_mean"]["auc"].append(metrics['auc'])
+            metrics_subjects["llava7b"]["rollout_mean"]["nss"].append(metrics['nss'])
+            metrics_subjects["llava7b"]["rollout_mean"]["kld"].append(metrics['kld'])
+            metrics_subjects["llava7b"]["rollout_mean"]["cc"].append(metrics['cc'])
+            
+            metrics = compute_saliency_metrics(saliency_map_llava7b_max, saliency_map_trial, fixations_trial)
+            metrics_subjects["llava7b"]["rollout_max"]["sim"].append(metrics['sim'])
+            metrics_subjects["llava7b"]["rollout_max"]["auc"].append(metrics['auc'])
+            metrics_subjects["llava7b"]["rollout_max"]["nss"].append(metrics['nss'])
+            metrics_subjects["llava7b"]["rollout_max"]["kld"].append(metrics['kld'])
+            metrics_subjects["llava7b"]["rollout_max"]["cc"].append(metrics['cc'])
+            
+            # LLaVA 13B comparison metrics
+            metrics = compute_saliency_metrics(saliency_map_llava13b_mean, saliency_map_trial, fixations_trial)
+            metrics_subjects["llava13b"]["rollout_mean"]["sim"].append(metrics['sim'])
+            metrics_subjects["llava13b"]["rollout_mean"]["auc"].append(metrics['auc'])
+            metrics_subjects["llava13b"]["rollout_mean"]["nss"].append(metrics['nss'])
+            metrics_subjects["llava13b"]["rollout_mean"]["kld"].append(metrics['kld'])
+            metrics_subjects["llava13b"]["rollout_mean"]["cc"].append(metrics['cc'])
+            
+            metrics = compute_saliency_metrics(saliency_map_llava13b_max, saliency_map_trial, fixations_trial)
+            metrics_subjects["llava13b"]["rollout_max"]["sim"].append(metrics['sim'])
+            metrics_subjects["llava13b"]["rollout_max"]["auc"].append(metrics['auc'])
+            metrics_subjects["llava13b"]["rollout_max"]["nss"].append(metrics['nss'])
+            metrics_subjects["llava13b"]["rollout_max"]["kld"].append(metrics['kld'])
+            metrics_subjects["llava13b"]["rollout_max"]["cc"].append(metrics['cc'])
 
 
     
     compute_table_metrics(metrics_subjects, print_table=True)
+    compute_table_metrics_split(metrics_subjects, print_table=True)
     compute_descriptive_statistics(metrics_saliency, print_table=True)
     
     
