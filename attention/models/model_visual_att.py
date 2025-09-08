@@ -9,7 +9,7 @@ cwd = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(cwd)
 cwd = os.path.abspath(__file__)
 sys.path.append(cwd)
-import pandas as pd
+from PIL import Image
 from visual_processer import ImageProcessor
 from model_att import ModelAttentionExtractor
 from transformers import (
@@ -44,26 +44,30 @@ class ModelVisualAttentionExtractor():
         return self.text_att.load_attention_df(*args, **kwargs)
 
     def prepare_input(self, image_path, text):
-        # Prepare image
+
         
-        if isinstance(image_path, str):
-            from PIL import Image
-            image = Image.open(image_path)
-        
-        # Create messages for chat template
+        image = Image.open(image_path).convert("RGB") if isinstance(image_path, str) else image_path
+
         messages = [
             {
                 "role": "user",
                 "content": [
-                    {"type": "image", "image": image},
-                    {"type": "text", "text": text}
-                ]
+                    {"type": "image"},                   # <-- placeholder only
+                    {"type": "text", "text": text},
+                ],
             }
         ]
-        # 1) Get the exact prompt STRING from the chat template
-        prompt = self.processor.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+
+        prompt = self.processor.apply_chat_template(
+            messages, add_generation_prompt=True
         )
+
+        inputs = self.processor(
+            images=image,
+            text=prompt,
+            return_tensors="pt"
+        ).to(self.model.device, torch.float16)
+
         inputs_tokenizer = self.processor.tokenizer(
             # text.split(' '),
             text,
@@ -73,13 +77,13 @@ class ModelVisualAttentionExtractor():
             return_tensors="pt",
         )
         
-        inputs = self.processor.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            tokenize=True,
-            return_dict=True,
-            return_tensors="pt",
-        ).to(self.model.device)
+        # inputs = self.processor.apply_chat_template(
+        #     messages,
+        #     add_generation_prompt=True,
+        #     tokenize=True,
+        #     return_dict=True,
+        #     return_tensors="pt",
+        # ).to(self.model.device)
         words = [text[s:e] for s, e in inputs_tokenizer.offset_mapping[0]]
         return inputs, inputs_tokenizer
     
@@ -227,32 +231,34 @@ class ModelVisualAttentionExtractor():
                     return i
             return -1
 
-    def find_image_token_positions(self, inputs):
-        """Find the positions of <image> tokens in the sequence"""
-        tok = self.processor.tokenizer
+    # def find_image_token_positions(self, inputs):
+    #     """Find the positions of <image> tokens in the sequence"""
+    #     tok = self.processor.tokenizer
         
-        # Find image token ID
-        image_token_id = None
-        if "<image>" in tok.get_vocab():
-            image_token_id = tok.convert_tokens_to_ids("<image>")
-        elif "additional_special_tokens" in tok.special_tokens_map:
-            for s in tok.special_tokens_map["additional_special_tokens"]:
-                if s == "<image>":
-                    image_token_id = tok.convert_tokens_to_ids(s)
-                    break
+    #     # Find image token ID
+    #     image_token_id = None
+    #     if "<image>" in tok.get_vocab():
+    #         image_token_id = tok.convert_tokens_to_ids("<image>")
+    #     elif "additional_special_tokens" in tok.special_tokens_map:
+    #         for s in tok.special_tokens_map["additional_special_tokens"]:
+    #             if s == "<image>":
+    #                 image_token_id = tok.convert_tokens_to_ids(s)
+    #                 break
         
-        if image_token_id is None:
-            raise ValueError("Token <image> not found")
+    #     if image_token_id is None:
+    #         raise ValueError("Token <image> not found")
         
-        input_ids = inputs["input_ids"][0]
-        image_positions = (input_ids == image_token_id).nonzero(as_tuple=False).flatten()
+    #     input_ids = inputs["input_ids"][0]
+    #     image_positions = (input_ids == image_token_id).nonzero(as_tuple=False).flatten()
         
-        return image_positions.tolist(), len(image_positions)
+    #     return image_positions.tolist(), len(image_positions)
+
     def find_token_idx(self, inputs):
         # Search subsequence (simple scan)
         
         special_token_idx = self.text_att.compute_special_token_idx(inputs['input_ids'][0], self.text_att.special_tokens_id)
-        image_token_idx, _ = self.find_image_token_positions(inputs)
+        image_token_idx = self.text_att.compute_special_token_idx(inputs['input_ids'][0], [self.text_att.vocab[self.text_att.tokenizer.special_tokens_map['image_token']]])
+        # image_token_idx, _ = self.find_image_token_positions(inputs)
         text_token_idx = [x for x in range(len(inputs['input_ids'][0])) if x not in special_token_idx]
         special_token_idx = [x for x in special_token_idx if x not in image_token_idx]
         
@@ -323,13 +329,15 @@ class ModelVisualAttentionExtractor():
             # image_aggregated_attention = [aggregated_attention[i] for i in image_token_idx]
             # relative_attention_image = scipy.special.softmax(image_aggregated_attention)
             # relative_attention_image = image_aggregated_attention
-            heat = self.visual_processor.sequence_attention_to_patch_heatmap(
-                    seq_attn=relative_attention_image,          # <- your 1D attention over keys
-                    start=0,
-                    gh=info["grid"][0],
-                    gw=info["grid"][1],
-                    has_cls=info["has_cls"]
-                )
+
+            heat  = a_img.reshape(info["grid"][0], info["grid"][1])
+            # heat = self.visual_processor.sequence_attention_to_patch_heatmap(
+            #         seq_attn=relative_attention_image,          # <- your 1D attention over keys
+            #         start=0,
+            #         gh=info["grid"][0],
+            #         gw=info["grid"][1],
+            #         has_cls=info["has_cls"]
+            #     )
             #-----text attention-----
             text_aggregated_attention = [
                     aggregated_attention[i] if i in text_token_idx else 0
@@ -369,13 +377,19 @@ class ModelVisualAttentionExtractor():
     @staticmethod
     def get_attention_model(model, inputs):
         # check if model has atribute device
-        if not hasattr(model, "device"):
-            input_ids = inputs["input_ids"]
-            attention_mask = inputs["attention_mask"]
-        else:
-            input_ids = inputs["input_ids"].to(model.device)
-            attention_mask = inputs["attention_mask"].to(model.device)
-        output = model(input_ids=input_ids, attention_mask=attention_mask)
+        # if not hasattr(model, "device"):
+        #     input_ids = inputs["input_ids"]
+        #     attention_mask = inputs["attention_mask"]
+        # else:
+        #     input_ids = inputs["input_ids"].to(model.device)
+        #     attention_mask = inputs["attention_mask"].to(model.device)
+            
+        with torch.no_grad():
+            output = model(
+                **inputs,
+                output_scores=True,
+                output_attentions=True,
+                )
         return output.attentions
 
     @staticmethod
@@ -390,16 +404,14 @@ class ModelVisualAttentionExtractor():
 
         # Generate with attention
         with torch.no_grad():
-            
-
             output = model.generate(
                 **inputs,
-                    do_sample=False,
-                    max_new_tokens=200,
-                    return_dict_in_generate=True,
-                    output_scores=True,
-                    output_attentions=True,
-                    use_cache=True
+                do_sample=False,
+                max_new_tokens=200,
+                return_dict_in_generate=True,
+                output_scores=True,
+                output_attentions=True,
+                use_cache=True
                 )
 
         input_length = inputs["input_ids"].size(1)
@@ -453,7 +465,7 @@ class ModelVisualAttentionExtractor():
         return r
 
 
-    def process_attention_rollout(
+    def  process_attention_rollout(
         self,
         attention,                       # tuple from generate(...).attentions, len N+1
         input_ids,
