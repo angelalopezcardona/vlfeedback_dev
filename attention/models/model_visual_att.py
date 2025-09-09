@@ -10,13 +10,15 @@ sys.path.append(cwd)
 cwd = os.path.abspath(__file__)
 sys.path.append(cwd)
 from PIL import Image
+
+import cv2
+import numpy as np
 from visual_processer import ImageProcessor
 from model_att import ModelAttentionExtractor
 from transformers import (
     BatchEncoding,
 )
 from tokenizeraligner.models.tokenizer_aligner import TokenizerAligner
-import numpy as np
 import scipy.special
 class ModelVisualAttentionExtractor():
     def __init__(self, model_name, model_type, folder_path_attention):
@@ -42,6 +44,77 @@ class ModelVisualAttentionExtractor():
 
     def load_attention_df(self, *args, **kwargs):
         return self.text_att.load_attention_df(*args, **kwargs)
+
+
+    def backproject_patch_saliency(
+        self,
+        patch_scores: np.ndarray,         # (gh, gw) attention over patches
+        original_image,                   # path or HxWx{1,3} np.ndarray (BGR ok)
+        model_input_size: int = 336,      # CLIP/LLaVA crop size
+        blur: bool = True,
+        sigma_scale: float = 4.0,         # multiply the patch-size-based sigma
+    ):
+        """
+        Map a patch-grid saliency/attention to the original image coordinates and (optionally) build an overlay.
+
+        Steps (CLIP-style geometry):
+        1) Upsample patch grid to SxS (NEAREST).
+        2) Paste into a canvas of the resized image (short side = S) at the center-crop window.
+        3) Resize that canvas back to the original HxW (NEAREST).
+        4) (Optional) Gaussian blur in pixel space with σ ≈ patch size in original pixels.
+
+        Returns
+        -------
+        saliency_raw : float32 HxW      # raw, aligned saliency (good for metrics)
+        overlay      : uint8 HxWx3 or None
+        """
+        S = int(model_input_size)
+
+        # --- load image ---
+        if isinstance(original_image, str):
+            img = cv2.imread(original_image, cv2.IMREAD_COLOR)
+            if img is None:
+                raise ValueError(f"Could not load image: {original_image}")
+        else:
+            img = original_image.copy()
+            if img.ndim == 2:
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        H, W = img.shape[:2]
+
+        # --- 1) patch grid -> SxS (NEAREST) ---
+        gh, gw = patch_scores.shape
+        heat_S = cv2.resize(patch_scores.astype(np.float32), (S, S), interpolation=cv2.INTER_NEAREST)
+
+        # --- 2) compute resized canvas size (short side -> S) and crop window ---
+        scale = S / min(W, H)
+        W_res = int(round(W * scale))
+        H_res = int(round(H * scale))
+        cx = max(0, (W_res - S) // 2)
+        cy = max(0, (H_res - S) // 2)
+
+        # paste SxS heatmap in the crop window on a canvas of the resized image
+        canvas = np.zeros((H_res, W_res), dtype=np.float32)
+        ex = min(cx + S, W_res)
+        ey = min(cy + S, H_res)
+        canvas[cy:ey, cx:ex] = heat_S[:ey - cy, :ex - cx]
+
+        # --- 3) resize canvas back to original size (NEAREST) ---
+        saliency_raw = cv2.resize(canvas, (W, H), interpolation=cv2.INTER_NEAREST).astype(np.float32)
+
+        # --- 4) optional Gaussian smoothing in pixel space, σ tied to patch size in original pixels ---
+        if blur:
+            # patch size in canvas: S/gw (x), S/gh (y)
+            # mapping to original: multiply by (W/W_res) and (H/H_res)
+            patch_w_orig = (S / gw) * (W / max(W_res, 1))
+            patch_h_orig = (S / gh) * (H / max(H_res, 1))
+            # set σ so that FWHM ~ one patch (σ = patch/2.355). You can scale it with sigma_scale.
+            sigmaX = max(0.1, (patch_w_orig / 2.355) * sigma_scale)
+            sigmaY = max(0.1, (patch_h_orig / 2.355) * sigma_scale)
+            saliency_raw = cv2.GaussianBlur(
+                saliency_raw, (0, 0), sigmaX=sigmaX, sigmaY=sigmaY, borderType=cv2.BORDER_REPLICATE
+            )
+
+        return saliency_raw
 
     def prepare_input(self, image_path, text):
 
@@ -193,6 +266,8 @@ class ModelVisualAttentionExtractor():
                     info = info,
                 )
                 
+            for layer, attention_image in attention_image_trial.items():
+                attention_image["heatmap"] = self.backproject_patch_saliency(attention_image["heatmap"], images_trials_paths[int(trial)])
             attention_trials_image[trial] = attention_image_trial
             attention_trials_text[trial] = attention_text_trial
                 
