@@ -8,6 +8,8 @@ import numpy as np
 from eyetrackpy.data_processor.models.saliency_generator import SaliencyGenerator
 from eyetrackpy.data_generator.utils.saliency_metrics import compute_cc, compute_kl, compute_nss, compute_auc, compute_sim
 import pandas as pd
+import cv2
+from PIL import Image
 cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(cwd)
 
@@ -404,6 +406,27 @@ if __name__ == "__main__":
     for prompt_number, _ in prompts.items():
         box_image = ETDataLoader().find_image_in_screenshot(prompts_screenshots[prompt_number], images[prompt_number], draw_result=False)
         saliency_map_visalformer = np.load(results_path_saliency + '/saliency_trial_{}.npy'.format(prompt_number))
+        
+        # Get human saliency shape for resizing (use first available subject)
+        human_saliency_shape = None
+        for subject_id, saliency_maps in subject_saliency.items():
+            if prompt_number in saliency_maps:
+                human_saliency_shape = saliency_maps[prompt_number].shape
+                break
+        
+        # Resize and normalize Visalformer if human saliency shape is available
+        if human_saliency_shape is not None:
+            img_height, img_width = human_saliency_shape
+            
+            # Convert to PIL Image for resizing
+            visalformer_pil = Image.fromarray(saliency_map_visalformer)
+            visalformer_resized = visalformer_pil.resize((img_width, img_height), Image.BILINEAR)
+            saliency_map_visalformer = np.array(visalformer_resized)
+            
+            # Normalize using cv2
+            saliency_map_visalformer = cv2.normalize(saliency_map_visalformer, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+            # Convert back to float and normalize to 0-1 range
+            saliency_map_visalformer = saliency_map_visalformer.astype(np.float32) / 255.0
         saliency_map_mdsem_05 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_500.npy'.format(prompt_number))
         saliency_map_mdsem_3 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_3000.npy'.format(prompt_number))
         saliency_map_mdsem_5 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_5000.npy'.format(prompt_number))
