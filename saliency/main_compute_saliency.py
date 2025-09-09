@@ -8,7 +8,7 @@ import numpy as np
 from eyetrackpy.data_processor.models.saliency_generator import SaliencyGenerator
 if __name__ == "__main__":
     subjects = [1,2,3,4,5,6,7,8, 9,10, 11,12,14,15]
-    subjects = [11,12,14,15]
+    # subjects = [11,12,14,15]
     # paths
     cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) 
     raw_data_path = cwd + "/data/raw/et"
