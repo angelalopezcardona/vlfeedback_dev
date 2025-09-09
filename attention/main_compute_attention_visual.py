@@ -24,11 +24,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
     models = {
         # -----------------------------------------------
-        # "llava-hf/llava-1.5-7b-hf": "causalLM",
-        "llava-hf/llava-1.5-13b-hf": "causalLM",
+        "llava-hf/llava-1.5-7b-hf": "causalLM",
+        # "llava-hf/llava-1.5-13b-hf": "causalLM",
         
     }
-
+    method = args.method
+    if method == 'rollout':
+            folder = 'attention_rollout/'
+    else:
+        folder = 'attention/'
     cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     raw_data_path = cwd + "/data/raw/et"
     process_data_path = cwd + "/data/processed/et"
@@ -49,17 +53,14 @@ if __name__ == "__main__":
     for model_name, model_type in models.items():
         # Load the model
         model_name.replace("/", "_")
-        method = 'normal'
-        if method == 'rollout':
-            folder = 'attention_rollout/'
-        else:
-            folder = 'attention/'
+        
         folder_path_attention = (
             save_path
             + folder
             + model_name.split("/")[1]
             + "/"
         )
+        print(f"Folder path attention: {folder_path_attention} for model {model_name} and method {method}")
        
         
         att_extractor = ModelVisualAttentionExtractor(model_name, model_type, folder_path_attention)

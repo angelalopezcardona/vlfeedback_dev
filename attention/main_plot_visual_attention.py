@@ -61,17 +61,19 @@ if __name__ == "__main__":
     prompt_number_plot = list(range(1, 31))
     cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     raw_data_path = cwd + "/data/raw/et"
-    # process_data_path = cwd + "/results/et/attention_rollout/llava-1.5-7b-hf/saliency/"
-    process_data_path = cwd + "/attention_saliency/llava7b_attention/"
+    process_data_path = cwd + "/results/et/attention_rollout/llava-1.5-7b-hf/saliency/"
+    process_data_path = cwd + "/results/et/attention_rollout/llava-1.5-13b-hf/saliency/"
+    # process_data_path = cwd + "/attention_saliency/llava7b_attention/"
     responses, images, prompts, prompts_screenshots = ETDataLoader().load_data(raw_data_path=raw_data_path)
     saliency_generator = SaliencyGenerator()
 
     for prompt_number, _ in prompts.items():
-        # saliency_map = np.load(process_data_path + 'trial_{}/saliency_trial_{}_layer_gen_rollout.npy'.format(prompt_number, prompt_number))
-        saliency_map = np.load(process_data_path + 'img_prompt_{}_rollout_max.npy'.format(prompt_number))
+        saliency_map = np.load(process_data_path + 'trial_{}/saliency_trial_{}_layer_gen_rollout.npy'.format(prompt_number, prompt_number))
+        # saliency_map = np.load(process_data_path + 'img_prompt_{}_rollout_max.npy'.format(prompt_number))
 
 
         figure_name_human="saliency_human_{}.png".format(prompt_number)
+        print(f"Saliency map path: {process_data_path + 'trial_{}/saliency_trial_{}_layer_gen_rollout.npy'.format(prompt_number, prompt_number)}")
         saliency_generator.create_overlay_and_save_saliency_map(
             images[prompt_number], 
             saliency_map, 
