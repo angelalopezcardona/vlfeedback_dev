@@ -52,7 +52,7 @@ class ModelVisualAttentionExtractor():
         original_image,                   # path or HxWx{1,3} np.ndarray (BGR ok)
         model_input_size: int = 336,      # CLIP/LLaVA crop size
         blur: bool = True,
-        sigma_scale: float = 4.0,         # multiply the patch-size-based sigma
+        sigma_scale: float = 15,         # multiply the patch-size-based sigma
     ):
         """
         Map a patch-grid saliency/attention to the original image coordinates and (optionally) build an overlay.
@@ -165,7 +165,6 @@ class ModelVisualAttentionExtractor():
             return_offsets_mapping=True,
             return_tensors="pt",
         )
-        words = [text[s:e] for s, e in inputs_tokenizer.offset_mapping[0]]
         return inputs, inputs_tokenizer
     
 
@@ -190,30 +189,17 @@ class ModelVisualAttentionExtractor():
         relative_attention_text = scipy.special.softmax(text_aggregated_attention)
         return relative_attention_text
 
-    def extract_attention(self, texts_trials: dict, attention_method ='rollout'):
+    def extract_attention_only_text(self, texts_trials: dict, attention_method ='rollout'):
         """
-        Extract attention from visual LLM with both text and image inputs
-        
-        Args:
-            texts_trials: dict with trial_id -> list of words
-            images_trials: dict with trial_id -> image_path or PIL Image
-            word_level: whether to return word-level or token-level attention
         """
-        attention_trials_image = {}
         attention_trials_text = {}
         
         for trial, list_text in texts_trials.items():
-            if '.' in str(trial):
+            if '.' not in str(trial):
                 continue
                 
-            if int(trial) not in images_trials_paths:
-                print(f"Warning: No image found for trial {trial}, skipping...")
-                continue
-                
-            print("Processing trial", trial)
-            
-            # try:
-            # Prepare text
+            print("Processing response", trial)
+
             list_word_original = [str(x) for x in list_text]
             text = " ".join(list_word_original)
             list_word_original = [x.lower() for x in list_word_original]
@@ -222,19 +208,19 @@ class ModelVisualAttentionExtractor():
             text_token_idx, image_token_idx, special_token_idx = self.find_token_idx(inputs_id)   
             if attention_method =='rollout':
                 print("Processing trial", trial, "with rollout")
-                attention, confidences = self.get_attention_model_steps(self.model, inputs_id)
+                # attention, confidences = self.get_attention_model_steps(self.model, inputs_id)
                 
-                _, attention_text_trial = self.process_attention_rollout(
-                    attention = attention, 
-                    input_ids = inputs_id, 
-                    input_ids_tokenizer = inputs_id_tokenizer, 
-                    text = text,
-                    list_word_original = list_word_original, 
-                    text_token_idx = text_token_idx,
-                    image_token_idx = image_token_idx,
-                    special_token_idx = special_token_idx,
-                    confidences = confidences,
-                )
+                # _, attention_text_trial = self.process_attention_rollout(
+                #     attention = attention, 
+                #     input_ids = inputs_id, 
+                #     input_ids_tokenizer = inputs_id_tokenizer, 
+                #     text = text,
+                #     list_word_original = list_word_original, 
+                #     text_token_idx = text_token_idx,
+                #     image_token_idx = image_token_idx,
+                #     special_token_idx = special_token_idx,
+                #     confidences = confidences,
+                # )
             else:
                 attention = self.get_attention_model(self.model, inputs_id)
                 
@@ -340,7 +326,7 @@ class ModelVisualAttentionExtractor():
                 )
                 
             for layer, attention_image in attention_image_trial.items():
-                attention_image["heatmap"] = self.backproject_patch_saliency(attention_image["heatmap"], images_trials_paths[int(trial)])
+                attention_image_trial[layer]["heatmap"] = self.backproject_patch_saliency(attention_image["heatmap"], images_trials_paths[int(trial)])
             attention_trials_image[trial] = attention_image_trial
             attention_trials_text[trial] = attention_text_trial
                 
@@ -355,7 +341,8 @@ class ModelVisualAttentionExtractor():
                 save_folder = path_save + "/trial_" + str(trial)
                 os.makedirs(save_folder, exist_ok=True)
                 np.save(os.path.join(save_folder, f"saliency_trial_{trial}_layer_{layer}.npy"), heat)
-                SaliencyGenerator.create_overlay(image_path=images_trials_paths[int(trial)], saliency_map=heat)
+                overlay = SaliencyGenerator.create_overlay(image_path=images_trials_paths[int(trial)], saliency_map=heat)
+                cv2.imwrite(os.path.join(save_folder, f"attention_overlay_{trial}_layer_{layer}.png"), overlay)
                 # save_attention_overlay_with_grid = self.visual_processor.save_attention_overlay_with_grid(
                 #     image_path=images_trials_paths[int(trial)],
                 #     heat=heat,
@@ -406,7 +393,10 @@ class ModelVisualAttentionExtractor():
         marker_ids = self.processor.tokenizer(marker, add_special_tokens=False).input_ids
         assistant_pattern = self.find_subsequence(inputs['input_ids'][0], marker_ids)
         assistant_pattern_idx = list(range(assistant_pattern, assistant_pattern + len(marker_ids)))
-        tokens_to_remove = [idx for idx in text_token_idx if idx < image_token_idx[-1] or idx in assistant_pattern_idx]
+        if len(image_token_idx) > 0:
+            tokens_to_remove = [idx for idx in text_token_idx if idx < image_token_idx[-1] or idx in assistant_pattern_idx]
+        else:
+            tokens_to_remove = [idx for idx in text_token_idx if idx in assistant_pattern_idx]
         text_token_idx = [idx for idx in text_token_idx if idx not in tokens_to_remove]
         special_token_idx.extend(tokens_to_remove)
         return text_token_idx, image_token_idx, special_token_idx
@@ -456,28 +446,23 @@ class ModelVisualAttentionExtractor():
             # ]
             #-----image attention----------------------------------------------------
             # ---- choose queries and keys explicitly ----
-            idx = np.asarray(image_token_idx)
-            assert np.all(np.diff(idx) == 1), "image_token_idx must be contiguous & ascending"
+            if len(image_token_idx) > 0:
+                idx = np.asarray(image_token_idx)
+                assert np.all(np.diff(idx) == 1), "image_token_idx must be contiguous & ascending"
 
-            Q = np.asarray(text_token_idx, dtype=int)          # queries = TEXT ONLY
-            K = np.asarray(image_token_idx, dtype=int)         # keys = IMAGE BLOCK (as in LLM seq)
-            M_qk = mean_attention[np.ix_(Q, K)] 
-            a_img = M_qk.sum(axis=0) / max(len(Q), 1)      
-            # Optional: normalize only within the image block
-            a_img = a_img / (a_img.sum() + 1e-12)
-            relative_attention_image = a_img
-            # image_aggregated_attention = [aggregated_attention[i] for i in image_token_idx]
-            # relative_attention_image = scipy.special.softmax(image_aggregated_attention)
-            # relative_attention_image = image_aggregated_attention
+                Q = np.asarray(text_token_idx, dtype=int)          # queries = TEXT ONLY
+                K = np.asarray(image_token_idx, dtype=int)         # keys = IMAGE BLOCK (as in LLM seq)
+                M_qk = mean_attention[np.ix_(Q, K)] 
+                a_img = M_qk.sum(axis=0) / max(len(Q), 1)      
+                # Optional: normalize only within the image block
+                a_img = a_img / (a_img.sum() + 1e-12)
+                relative_attention_image = a_img
 
-            heat  = a_img.reshape(info["grid"][0], info["grid"][1])
-            # heat = self.visual_processor.sequence_attention_to_patch_heatmap(
-            #         seq_attn=relative_attention_image,          # <- your 1D attention over keys
-            #         start=0,
-            #         gh=info["grid"][0],
-            #         gw=info["grid"][1],
-            #         has_cls=info["has_cls"]
-            #     )
+
+                heat  = a_img.reshape(info["grid"][0], info["grid"][1])
+            else:
+                relative_attention_image = np.zeros(len(image_token_idx))
+                heat = np.zeros((1, 1))
             #-----text attention-----
             text_aggregated_attention = [
                     aggregated_attention[i] if i in text_token_idx else 0

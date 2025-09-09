@@ -19,13 +19,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
         "--method",
-        default='rollout',
+        default='normal',
     )
     args = parser.parse_args()
     models = {
         # -----------------------------------------------
-        # "llava-hf/llava-1.5-7b-hf": "causalLM",
-        # "llava-hf/llava-1.5-13b-hf": "causalLM",
+        "llava-hf/llava-1.5-7b-hf": "causalLM",
+        "llava-hf/llava-1.5-13b-hf": "causalLM",
         
     }
     method = args.method
@@ -65,12 +65,19 @@ if __name__ == "__main__":
         
         att_extractor = ModelVisualAttentionExtractor(model_name, model_type, folder_path_attention)
         # prompts_words = {'20': prompts_words['20']}
-        attention_trials_image, attention_trials_text, info = att_extractor.extract_attention(
-            prompts_words, images_trials_paths=images_trials_paths,
-            attention_method=method
-        )
+        #compute attention for prompts
+        # attention_trials_image, attention_trials_text, info = att_extractor.extract_attention(
+        #     prompts_words, images_trials_paths=images_trials_paths,
+        #     attention_method=method
+        # )
 
-        att_extractor.save_attention_trials_image(images_trials_paths, attention_trials_image, info, folder_path_attention + "saliency/")
-        att_extractor.save_attention_df(attention_trials_text, prompts_words, folder_path_attention)
+        # att_extractor.save_attention_trials_image(images_trials_paths, attention_trials_image, info, folder_path_attention + "saliency/")
+        # att_extractor.save_attention_df(attention_trials_text, prompts_words, folder_path_attention)
+
+        #compute attention for responses
+        attention_trials_text = att_extractor.extract_attention_only_text(
+            responses_words, attention_method=method
+        )
+        att_extractor.save_attention_df(attention_trials_text, responses_words, folder_path_attention)
 
         
