@@ -14,16 +14,12 @@ cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(cwd)
 
  # Define model names and their corresponding data
-model_names = ['Visalformer', 'MDSEM-500', 'MDSEM-3000', 'MDSEM-5000', 'LLaVA-7B-mean', 'LLaVA-7B-max', 'LLaVA-13B-mean', 'LLaVA-13B-max']
+model_names = ['Visalformer', 'MDSEM-500', 'MDSEM-3000', 'MDSEM-5000']
 model_data_keys = [
     ('visalformer', None),
     ('mdsem', '500'),
     ('mdsem', '3000'),
     ('mdsem', '5000'),
-    ('llava7b', 'rollout_mean'),
-    ('llava7b', 'rollout_max'),
-    ('llava13b', 'rollout_mean'),
-    ('llava13b', 'rollout_max')
 ]
     
 def compute_descriptive_statistics(metrics_saliency, print_table=True):
@@ -102,12 +98,7 @@ def compute_descriptive_statistics(metrics_saliency, print_table=True):
         print(latex_table)
 
     # Split descriptive stats into attention vs saliency models
-    attention_specs = [
-        ('LLaVA-7B-mean', ('llava7b', 'rollout_mean')),
-        ('LLaVA-7B-max', ('llava7b', 'rollout_max')),
-        ('LLaVA-13B-mean', ('llava13b', 'rollout_mean')),
-        ('LLaVA-13B-max', ('llava13b', 'rollout_max')),
-    ]
+
     saliency_specs = [
         ('Visalformer', ('visalformer', None)),
         ('MDSEM-500', ('mdsem', '500')),
@@ -128,8 +119,7 @@ def compute_descriptive_statistics(metrics_saliency, print_table=True):
             })
         return rows
 
-    pd.DataFrame(build_desc_rows(attention_specs)).to_csv(
-        os.path.join(results_path_saliency, 'descriptive_metrics_attention.csv'), index=False)
+
     pd.DataFrame(build_desc_rows(saliency_specs)).to_csv(
         os.path.join(results_path_saliency, 'descriptive_metrics_saliency_models.csv'), index=False)
 
@@ -158,7 +148,6 @@ def compute_descriptive_statistics(metrics_saliency, print_table=True):
             latex_table += "\\end{table}\n"
             return latex_table
         
-        print(generate_desc_latex(attention_specs, 'Descriptive Statistics (Attention Models: LLaVA)'))
         print(generate_desc_latex(saliency_specs, 'Descriptive Statistics (Saliency Models: Visalformer + MDSEM)'))
 
     return True
@@ -223,12 +212,7 @@ def compute_table_metrics(metrics_subjects, print_table=True):
 def compute_table_metrics_split(metrics_subjects, print_table=True):
     """Create and save separate comparison tables for attention (LLaVA) and saliency (Visalformer+MDSEM) models."""
     # Define model groups: (display_name, (main_key, sub_key))
-    attention_models = [
-        ('LLaVA-7B-mean', ('llava7b', 'rollout_mean')),
-        ('LLaVA-7B-max', ('llava7b', 'rollout_max')),
-        ('LLaVA-13B-mean', ('llava13b', 'rollout_mean')),
-        ('LLaVA-13B-max', ('llava13b', 'rollout_max')),
-    ]
+
     saliency_models = [
         ('Visalformer', ('visalformer', None)),
         ('MDSEM-500', ('mdsem', '500')),
@@ -269,14 +253,10 @@ def compute_table_metrics_split(metrics_subjects, print_table=True):
         latex_table += "\\end{tabular}\n"
         latex_table += "\\end{table}\n"
         return latex_table
-
-    attn_df = build_df(attention_models)
     sal_df = build_df(saliency_models)
-    attn_df.to_csv(os.path.join(results_path_saliency, 'comparison_metrics_attention.csv'), index=False)
     sal_df.to_csv(os.path.join(results_path_saliency, 'comparison_metrics_saliency_models.csv'), index=False)
 
     if print_table:
-        print(to_latex(attention_models, 'Comparison Metrics (Attention Models: LLaVA)'))
         print(to_latex(saliency_models, 'Comparison Metrics (Saliency Models: Visalformer + MDSEM)'))
     return True
 
@@ -387,14 +367,6 @@ if __name__ == "__main__":
             "500" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}, 
             "3000" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}, 
             "5000" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}
-        },
-        "llava7b" : {
-            "rollout_mean" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []},
-            "rollout_max" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}
-        },
-        "llava13b" : {
-            "rollout_mean" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []},
-            "rollout_max" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []}
         }
     }
       
