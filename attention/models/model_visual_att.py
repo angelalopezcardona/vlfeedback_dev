@@ -10,7 +10,7 @@ sys.path.append(cwd)
 cwd = os.path.abspath(__file__)
 sys.path.append(cwd)
 from PIL import Image
-
+from eyetrackpy.data_processor.models.saliency_generator import SaliencyGenerator
 import cv2
 import numpy as np
 from visual_processer import ImageProcessor
@@ -118,28 +118,44 @@ class ModelVisualAttentionExtractor():
 
     def prepare_input(self, image_path, text):
 
-        
-        image = Image.open(image_path).convert("RGB") if isinstance(image_path, str) else image_path
+        if image_path is None:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": text},
+                    ],
+                }
+            ]
+            prompt = self.processor.apply_chat_template(
+                messages, add_generation_prompt=True
+            )
+            inputs = self.processor(
+                text=prompt,
+                return_tensors="pt"
+            ).to(self.model.device, torch.float16)
+        else:
+            image = Image.open(image_path).convert("RGB") if isinstance(image_path, str) else image_path
 
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image"},                   # <-- placeholder only
-                    {"type": "text", "text": text},
-                ],
-            }
-        ]
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image"},                
+                        {"type": "text", "text": text},
+                    ],
+                }
+            ]
 
-        prompt = self.processor.apply_chat_template(
-            messages, add_generation_prompt=True
-        )
+            prompt = self.processor.apply_chat_template(
+                messages, add_generation_prompt=True
+            )
 
-        inputs = self.processor(
-            images=image,
-            text=prompt,
-            return_tensors="pt"
-        ).to(self.model.device, torch.float16)
+            inputs = self.processor(
+                images=image,
+                text=prompt,
+                return_tensors="pt"
+            ).to(self.model.device, torch.float16)
 
         inputs_tokenizer = self.processor.tokenizer(
             # text.split(' '),
@@ -149,14 +165,6 @@ class ModelVisualAttentionExtractor():
             return_offsets_mapping=True,
             return_tensors="pt",
         )
-        
-        # inputs = self.processor.apply_chat_template(
-        #     messages,
-        #     add_generation_prompt=True,
-        #     tokenize=True,
-        #     return_dict=True,
-        #     return_tensors="pt",
-        # ).to(self.model.device)
         words = [text[s:e] for s, e in inputs_tokenizer.offset_mapping[0]]
         return inputs, inputs_tokenizer
     
@@ -181,6 +189,71 @@ class ModelVisualAttentionExtractor():
             features_mapped_second_words = text_aggregated_attention_tokenizer)
         relative_attention_text = scipy.special.softmax(text_aggregated_attention)
         return relative_attention_text
+
+    def extract_attention(self, texts_trials: dict, attention_method ='rollout'):
+        """
+        Extract attention from visual LLM with both text and image inputs
+        
+        Args:
+            texts_trials: dict with trial_id -> list of words
+            images_trials: dict with trial_id -> image_path or PIL Image
+            word_level: whether to return word-level or token-level attention
+        """
+        attention_trials_image = {}
+        attention_trials_text = {}
+        
+        for trial, list_text in texts_trials.items():
+            if '.' in str(trial):
+                continue
+                
+            if int(trial) not in images_trials_paths:
+                print(f"Warning: No image found for trial {trial}, skipping...")
+                continue
+                
+            print("Processing trial", trial)
+            
+            # try:
+            # Prepare text
+            list_word_original = [str(x) for x in list_text]
+            text = " ".join(list_word_original)
+            list_word_original = [x.lower() for x in list_word_original]
+            inputs_id, inputs_id_tokenizer = self.prepare_input(None, text)
+            
+            text_token_idx, image_token_idx, special_token_idx = self.find_token_idx(inputs_id)   
+            if attention_method =='rollout':
+                print("Processing trial", trial, "with rollout")
+                attention, confidences = self.get_attention_model_steps(self.model, inputs_id)
+                
+                _, attention_text_trial = self.process_attention_rollout(
+                    attention = attention, 
+                    input_ids = inputs_id, 
+                    input_ids_tokenizer = inputs_id_tokenizer, 
+                    text = text,
+                    list_word_original = list_word_original, 
+                    text_token_idx = text_token_idx,
+                    image_token_idx = image_token_idx,
+                    special_token_idx = special_token_idx,
+                    confidences = confidences,
+                )
+            else:
+                attention = self.get_attention_model(self.model, inputs_id)
+                
+                _, attention_text_trial = self.process_attention(
+                    attention = attention, 
+                    input_ids = inputs_id, 
+                    input_ids_tokenizer = inputs_id_tokenizer, 
+                    text = text,
+                    list_word_original = list_word_original, 
+                    method = "mean_diagonal_below",
+                    text_token_idx = text_token_idx,
+                    image_token_idx = image_token_idx,
+                    special_token_idx = special_token_idx,
+                )
+                
+           
+            attention_trials_text[trial] = attention_text_trial
+                
+        return attention_trials_text
 
     def extract_attention(self, texts_trials: dict, images_trials_paths: dict, attention_method ='rollout'):
         """
@@ -278,27 +351,19 @@ class ModelVisualAttentionExtractor():
             for layer, attention_image in attention_image_trial.items():
                 heat = attention_image["heatmap"]
                 attention_image_layer = attention_image["attention"]
-                #attention_image_layer hsa been already processed, we just need to convert it to a heatmap
-                #the dimensions area already correct
-                
-                # out_path = self.visual_processor.save_attention_overlay(
+
+                save_folder = path_save + "/trial_" + str(trial)
+                os.makedirs(save_folder, exist_ok=True)
+                np.save(os.path.join(save_folder, f"saliency_trial_{trial}_layer_{layer}.npy"), heat)
+                SaliencyGenerator.create_overlay(image_path=images_trials_paths[int(trial)], saliency_map=heat)
+                # save_attention_overlay_with_grid = self.visual_processor.save_attention_overlay_with_grid(
                 #     image_path=images_trials_paths[int(trial)],
                 #     heat=heat,
                 #     info=info,
-                #     save_folder=self.folder_path_attention + "attention_overlay/",
+                #     save_folder=save_folder,
                 #     image_name=f"attention_overlay_{trial}_layer_{layer}.png",
                 # )
-                save_folder = path_save + "/trial_" + str(trial)
-                os.makedirs(save_folder, exist_ok=True)
-                save_attention_overlay_with_grid = self.visual_processor.save_attention_overlay_with_grid(
-                    image_path=images_trials_paths[int(trial)],
-                    heat=heat,
-                    info=info,
-                    save_folder=save_folder,
-                    image_name=f"attention_overlay_{trial}_layer_{layer}.png",
-                )
                 # Save heatmap array
-                np.save(os.path.join(save_folder, f"saliency_trial_{trial}_layer_{layer}.npy"), heat)
     @staticmethod
     def find_subsequence(seq, subseq):
             for i in range(len(seq) - len(subseq) + 1):

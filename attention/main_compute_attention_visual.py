@@ -19,12 +19,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
         "--method",
-        default='normal',
+        default='rollout',
     )
     args = parser.parse_args()
     models = {
         # -----------------------------------------------
-        "llava-hf/llava-1.5-7b-hf": "causalLM",
+        # "llava-hf/llava-1.5-7b-hf": "causalLM",
         # "llava-hf/llava-1.5-13b-hf": "causalLM",
         
     }
