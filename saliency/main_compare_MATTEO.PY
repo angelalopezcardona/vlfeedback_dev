@@ -377,8 +377,8 @@ if __name__ == "__main__":
     subject_fixations = ETDataLoader().load_subject_fixations(subjects = subjects, raw_data_path=raw_data_path)
     saliency_generator = SaliencyGenerator()
 
-    results_path_saliency = save_path + '/visalformer/saliency'
-    results_path_saliency_mdsem = save_path + '/mdsem/salmaps_arrays'
+    results_path_llava7b = cwd + '/attention_saliency/llava7b_attention'
+    results_path_llava13b = cwd + '/attention_saliency/llava13b_attention'
     metrics_subjects = {
         "visalformer" : {'sim' : [], 'auc' : [], 'nss' : [], 'kld' : [], 'cc' : []},
         "mdsem" : {
@@ -400,31 +400,39 @@ if __name__ == "__main__":
         "subject" : {"SC" : [], "SE" : []}, 
         "visalformer" : {"SC": [], "SE" : []}, 
         "mdsem" : {"500" : {"SC" : [], "SE" : []}, '3000' : {"SC" : [], "SE" : []}, '5000' : {"SC" : [], "SE" : []}},
+        "llava7b" : {"rollout_mean" : {"SC" : [], "SE" : []}, "rollout_max" : {"SC" : [], "SE" : []}},
+        "llava13b" : {"rollout_mean" : {"SC" : [], "SE" : []}, "rollout_max" : {"SC" : [], "SE" : []}}
     }
     for prompt_number, _ in prompts.items():
         box_image = ETDataLoader().find_image_in_screenshot(prompts_screenshots[prompt_number], images[prompt_number], draw_result=False)
-        saliency_map_visalformer = np.load(results_path_saliency + '/saliency_trial_{}.npy'.format(prompt_number))
-        saliency_map_mdsem_05 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_500.npy'.format(prompt_number))
-        saliency_map_mdsem_3 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_3000.npy'.format(prompt_number))
-        saliency_map_mdsem_5 = np.load(results_path_saliency_mdsem + '/img_prompt_{}_5000.npy'.format(prompt_number))
-        saliency_coverage_visalformer = saliency_generator.compute_saliency_coverage(saliency_map_visalformer)
-        saliency_entropy_visalformer = saliency_generator.compute_shannon_entropy(saliency_map_visalformer)
-        metrics_saliency["visalformer"]['SC'].append(saliency_coverage_visalformer)
-        metrics_saliency["visalformer"]["SE"].append(saliency_entropy_visalformer)
-        saliency_coverage_mdsem_05 = saliency_generator.compute_saliency_coverage(saliency_map_mdsem_05)
-        saliency_entropy_mdsem_05 = saliency_generator.compute_shannon_entropy(saliency_map_mdsem_05)
-        metrics_saliency["mdsem"]["500"]["SC"].append(saliency_coverage_mdsem_05)
-        metrics_saliency["mdsem"]["500"]["SE"].append(saliency_entropy_mdsem_05)
-        saliency_coverage_mdsem_3 = saliency_generator.compute_saliency_coverage(saliency_map_mdsem_3)
-        saliency_entropy_mdsem_3 = saliency_generator.compute_shannon_entropy(saliency_map_mdsem_3)
-        metrics_saliency["mdsem"]["3000"]["SC"].append(saliency_coverage_mdsem_3)
-        metrics_saliency["mdsem"]["3000"]["SE"].append(saliency_entropy_mdsem_3)
-        saliency_coverage_mdsem_5 = saliency_generator.compute_saliency_coverage(saliency_map_mdsem_5)
-        saliency_entropy_mdsem_5 = saliency_generator.compute_shannon_entropy(saliency_map_mdsem_5)
-        metrics_saliency["mdsem"]["5000"]["SC"].append(saliency_coverage_mdsem_5)
-        metrics_saliency["mdsem"]["5000"]["SE"].append(saliency_entropy_mdsem_5)
-        
 
+        saliency_map_llava7b_mean = np.load(results_path_llava7b + '/img_prompt_{}_rollout_mean.npy'.format(prompt_number))
+        saliency_map_llava7b_max = np.load(results_path_llava7b + '/img_prompt_{}_rollout_max.npy'.format(prompt_number))
+        saliency_map_llava13b_mean = np.load(results_path_llava13b + '/img_prompt_{}_rollout_mean.npy'.format(prompt_number))
+        saliency_map_llava13b_max = np.load(results_path_llava13b + '/img_prompt_{}_rollout_max.npy'.format(prompt_number))
+
+        
+        # LLaVA 7B computations
+        saliency_coverage_llava7b_mean = saliency_generator.compute_saliency_coverage(saliency_map_llava7b_mean)
+        saliency_entropy_llava7b_mean = saliency_generator.compute_shannon_entropy(saliency_map_llava7b_mean)
+        metrics_saliency["llava7b"]["rollout_mean"]["SC"].append(saliency_coverage_llava7b_mean)
+        metrics_saliency["llava7b"]["rollout_mean"]["SE"].append(saliency_entropy_llava7b_mean)
+        
+        saliency_coverage_llava7b_max = saliency_generator.compute_saliency_coverage(saliency_map_llava7b_max)
+        saliency_entropy_llava7b_max = saliency_generator.compute_shannon_entropy(saliency_map_llava7b_max)
+        metrics_saliency["llava7b"]["rollout_max"]["SC"].append(saliency_coverage_llava7b_max)
+        metrics_saliency["llava7b"]["rollout_max"]["SE"].append(saliency_entropy_llava7b_max)
+        
+        # LLaVA 13B computations
+        saliency_coverage_llava13b_mean = saliency_generator.compute_saliency_coverage(saliency_map_llava13b_mean)
+        saliency_entropy_llava13b_mean = saliency_generator.compute_shannon_entropy(saliency_map_llava13b_mean)
+        metrics_saliency["llava13b"]["rollout_mean"]["SC"].append(saliency_coverage_llava13b_mean)
+        metrics_saliency["llava13b"]["rollout_mean"]["SE"].append(saliency_entropy_llava13b_mean)
+        
+        saliency_coverage_llava13b_max = saliency_generator.compute_saliency_coverage(saliency_map_llava13b_max)
+        saliency_entropy_llava13b_max = saliency_generator.compute_shannon_entropy(saliency_map_llava13b_max)
+        metrics_saliency["llava13b"]["rollout_max"]["SC"].append(saliency_coverage_llava13b_max)
+        metrics_saliency["llava13b"]["rollout_max"]["SE"].append(saliency_entropy_llava13b_max)
         
         for subject, saliency_maps in subject_saliency.items():
             fixations_trial = subject_fixations[subject]
@@ -435,34 +443,37 @@ if __name__ == "__main__":
             
             saliency_coverage = saliency_generator.compute_saliency_coverage(saliency_map_trial)
             saliency_entropy = saliency_generator.compute_shannon_entropy(saliency_map_trial)
-            metrics_saliency["subject"]["SC"].append(saliency_coverage)
-            metrics_saliency["subject"]["SE"].append(saliency_entropy)
-            metrics = compute_saliency_metrics(saliency_map_visalformer, saliency_map_trial, fixations_trial)
-            metrics_subjects["visalformer"]['sim'].append(metrics['sim'])
-            metrics_subjects["visalformer"]["auc"].append(metrics['auc'])
-            metrics_subjects["visalformer"]["nss"].append(metrics['nss'])
-            metrics_subjects["visalformer"]["kld"].append(metrics['kld'])
-            metrics_subjects["visalformer"]["cc"].append(metrics['cc'])
-            metrics = compute_saliency_metrics(saliency_map_mdsem_05, saliency_map_trial, fixations_trial)
-            metrics_subjects["mdsem"]["500"]["sim"].append(metrics['sim'])
-            metrics_subjects["mdsem"]["500"]["auc"].append(metrics['auc'])
-            metrics_subjects["mdsem"]["500"]["nss"].append(metrics['nss'])
-            metrics_subjects["mdsem"]["500"]["kld"].append(metrics['kld'])
-            metrics_subjects["mdsem"]["500"]["cc"].append(metrics['cc'])
-            metrics = compute_saliency_metrics(saliency_map_mdsem_3, saliency_map_trial, fixations_trial)
-            metrics_subjects["mdsem"]["3000"]["sim"].append(metrics['sim'])
-            metrics_subjects["mdsem"]["3000"]["auc"].append(metrics['auc'])
-            metrics_subjects["mdsem"]["3000"]["nss"].append(metrics['nss'])
-            metrics_subjects["mdsem"]["3000"]["kld"].append(metrics['kld'])
-            metrics_subjects["mdsem"]["3000"]["cc"].append(metrics['cc'])
-            metrics = compute_saliency_metrics(saliency_map_mdsem_5, saliency_map_trial, fixations_trial)
-            metrics_subjects["mdsem"]["5000"]["sim"].append(metrics['sim'])
-            metrics_subjects["mdsem"]["5000"]["auc"].append(metrics['auc'])
-            metrics_subjects["mdsem"]["5000"]["nss"].append(metrics['nss'])
-            metrics_subjects["mdsem"]["5000"]["kld"].append(metrics['kld'])
-            metrics_subjects["mdsem"]["5000"]["cc"].append(metrics['cc'])
+
             
-      
+            # LLaVA 7B comparison metrics
+            metrics = compute_saliency_metrics(saliency_map_llava7b_mean, saliency_map_trial, fixations_trial)
+            metrics_subjects["llava7b"]["rollout_mean"]["sim"].append(metrics['sim'])
+            metrics_subjects["llava7b"]["rollout_mean"]["auc"].append(metrics['auc'])
+            metrics_subjects["llava7b"]["rollout_mean"]["nss"].append(metrics['nss'])
+            metrics_subjects["llava7b"]["rollout_mean"]["kld"].append(metrics['kld'])
+            metrics_subjects["llava7b"]["rollout_mean"]["cc"].append(metrics['cc'])
+            
+            metrics = compute_saliency_metrics(saliency_map_llava7b_max, saliency_map_trial, fixations_trial)
+            metrics_subjects["llava7b"]["rollout_max"]["sim"].append(metrics['sim'])
+            metrics_subjects["llava7b"]["rollout_max"]["auc"].append(metrics['auc'])
+            metrics_subjects["llava7b"]["rollout_max"]["nss"].append(metrics['nss'])
+            metrics_subjects["llava7b"]["rollout_max"]["kld"].append(metrics['kld'])
+            metrics_subjects["llava7b"]["rollout_max"]["cc"].append(metrics['cc'])
+            
+            # LLaVA 13B comparison metrics
+            metrics = compute_saliency_metrics(saliency_map_llava13b_mean, saliency_map_trial, fixations_trial)
+            metrics_subjects["llava13b"]["rollout_mean"]["sim"].append(metrics['sim'])
+            metrics_subjects["llava13b"]["rollout_mean"]["auc"].append(metrics['auc'])
+            metrics_subjects["llava13b"]["rollout_mean"]["nss"].append(metrics['nss'])
+            metrics_subjects["llava13b"]["rollout_mean"]["kld"].append(metrics['kld'])
+            metrics_subjects["llava13b"]["rollout_mean"]["cc"].append(metrics['cc'])
+            
+            metrics = compute_saliency_metrics(saliency_map_llava13b_max, saliency_map_trial, fixations_trial)
+            metrics_subjects["llava13b"]["rollout_max"]["sim"].append(metrics['sim'])
+            metrics_subjects["llava13b"]["rollout_max"]["auc"].append(metrics['auc'])
+            metrics_subjects["llava13b"]["rollout_max"]["nss"].append(metrics['nss'])
+            metrics_subjects["llava13b"]["rollout_max"]["kld"].append(metrics['kld'])
+            metrics_subjects["llava13b"]["rollout_max"]["cc"].append(metrics['cc'])
 
 
     
