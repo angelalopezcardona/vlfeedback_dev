@@ -1,17 +1,9 @@
 ## Quick setup: what to configure in each script (not what they do)
 
 ### main_tobii_classification.py
-- Set via command line flags when you run it:
-  - input_file: path to raw Tobii CSV
-  - --blink_detection [true|false]
-  - --fs (Hz), --gap_dur (ms), --min_amplitude, --min_separation (ms)
-  - --debug [true|false], --filter_length (ms), --width_of_blink (ms), --min_blink_dur (ms)
-  - --noise_reduction [median|average|false], --noise_reduction_window, --velocity_threshold
-  - --merge_fixations [true|false], --merge_max_time (ms), --discard_short [true|false], --min_fixation_duration (ms)
-
 Example run:
 ```bash
-python main_tobii_classification.py path/to/raw.csv --fs 60 --noise_reduction median --velocity_threshold 30
+python main_tobii_classification.py path/to/raw.csv
 ```
 
 ### main_generate_synthetic_gaze.py
