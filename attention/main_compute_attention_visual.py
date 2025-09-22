@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
         "--method",
-        default='normal',
+        default='rollout',
     )
     args = parser.parse_args()
     models = {
