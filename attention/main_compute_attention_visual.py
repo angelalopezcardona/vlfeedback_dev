@@ -29,13 +29,13 @@ if __name__ == "__main__":
     }
     method = args.method
     if method == 'rollout':
-            folder = 'normal/'
+            folder = 'attention_rollout/'
     else:
         folder = 'attention/'
     cwd = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     raw_data_path = cwd + "/data/raw/et"
     process_data_path = cwd + "/data/processed/et"
-    save_path= cwd + '/results/et/'
+    save_path= cwd + '/results/'
 
     responses, images, prompts, prompts_screenshots = ETDataLoader().load_data(raw_data_path=raw_data_path)
     path_images = raw_data_path + "/images/"

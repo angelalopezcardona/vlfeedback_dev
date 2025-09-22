@@ -158,3 +158,4 @@ attention_saliency/tests_mllms/
 
 results/attention/results/
 results/attention_rollout/results/
+results/attention_rollout/llava-1.5-7b-hf/patch_plots/patch_grid_5.png
