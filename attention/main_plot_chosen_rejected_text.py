@@ -1,5 +1,5 @@
 import pandas as pd
-
+import os
 
 from models.plotter import Plotter
 
@@ -7,19 +7,19 @@ from models.compare_att import CompareAttention
 import pathlib
 # Define the path and files (same as your code)
 
-path = str(pathlib.Path(__file__).parent.resolve().parent.resolve()) + "/oasstetc_data/attention/results/"
+path = os.getcwd() + "/results/attention/results/"
 level = "trials"
 files = {
-    # "completed/correlation_" + level + "_fix_duration.csv": "TRT_f",
-    "completed/correlation_" + level + "_fix_duration_n.csv": "TRT_n_f",
-    # "completed/correlation_" + level + "_first_fix_duration.csv": "FFD_f",
-    "completed/correlation_" + level + "_first_fix_duration_n.csv": "FFD_n_f",
-    "completed/correlation_" + level + "_fix_number.csv": "nFix_f",
-    "not_filtered/correlation_" + level + "_fix_duration_n.csv": "TRT_n_not_f",
-    # "not_filtered/correlation_" + level + "_fix_duration.csv": "TRT_not_f",
-    # "not_filtered/correlation_" + level + "_first_fix_duration.csv": "FFD_not_f",
-    "not_filtered/correlation_" + level + "_first_fix_duration_n.csv": "FFD_n_not_f",
-    "not_filtered/correlation_" + level + "_fix_number.csv": "nFix_not_f",
+    # "correlation_" + level + "_fix_duration.csv": "TRT_f",
+    "correlation_" + level + "_fix_duration_n.csv": "TRT_n_f",
+    # "correlation_" + level + "_first_fix_duration.csv": "FFD_f",
+    "correlation_" + level + "_first_fix_duration_n.csv": "FFD_n_f",
+    "correlation_" + level + "_fix_number.csv": "nFix_f",
+    "correlation_" + level + "_fix_duration_n.csv": "TRT_n_not_f",
+    # "correlation_" + level + "_fix_duration.csv": "TRT_not_f",
+    # "correlation_" + level + "_first_fix_duration.csv": "FFD_not_f",
+    "correlation_" + level + "_first_fix_duration_n.csv": "FFD_n_not_f",
+    "correlation_" + level + "_fix_number.csv": "nFix_not_f",
 }
 
 
