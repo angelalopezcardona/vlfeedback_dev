@@ -156,3 +156,5 @@ attention_saliency/tests_mllms/
 .vscode/
 
 
+results/attention/results/
+results/attention_rollout/results/
