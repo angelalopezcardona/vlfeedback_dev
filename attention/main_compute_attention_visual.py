@@ -63,15 +63,15 @@ if __name__ == "__main__":
        
         
         att_extractor = ModelVisualAttentionExtractor(model_name, model_type, folder_path_attention)
-        # prompts_words = {'20': prompts_words['20']}
-        #compute attention for prompts
-        attention_trials_image, attention_trials_text, info = att_extractor.extract_attention(
-            prompts_words, images_trials_paths=images_trials_paths,
-            attention_method=method
-        )
+        # # prompts_words = {'20': prompts_words['20']}
+        # #compute attention for prompts
+        # attention_trials_image, attention_trials_text, info = att_extractor.extract_attention(
+        #     prompts_words, images_trials_paths=images_trials_paths,
+        #     attention_method=method
+        # )
 
-        att_extractor.save_attention_trials_image(images_trials_paths, attention_trials_image, info, folder_path_attention + "saliency/")
-        att_extractor.save_attention_df(attention_trials_text, prompts_words, folder_path_attention)
+        # att_extractor.save_attention_trials_image(images_trials_paths, attention_trials_image, info, folder_path_attention + "saliency/")
+        # att_extractor.save_attention_df(attention_trials_text, prompts_words, folder_path_attention)
 
         #compute attention for responses
         attention_trials_text = att_extractor.extract_attention_only_text(

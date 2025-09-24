@@ -208,19 +208,20 @@ class ModelVisualAttentionExtractor():
             text_token_idx, image_token_idx, special_token_idx = self.find_token_idx(inputs_id)   
             if attention_method =='rollout':
                 print("Processing trial", trial, "with rollout")
-                # attention, confidences = self.get_attention_model_steps(self.model, inputs_id)
+                attention, confidences = self.get_attention_model_steps(self.model, inputs_id)
                 
-                # _, attention_text_trial = self.process_attention_rollout(
-                #     attention = attention, 
-                #     input_ids = inputs_id, 
-                #     input_ids_tokenizer = inputs_id_tokenizer, 
-                #     text = text,
-                #     list_word_original = list_word_original, 
-                #     text_token_idx = text_token_idx,
-                #     image_token_idx = image_token_idx,
-                #     special_token_idx = special_token_idx,
-                #     confidences = confidences,
-                # )
+                _, attention_text_trial = self.process_attention_rollout(
+                    attention = attention, 
+                    input_ids = inputs_id, 
+                    input_ids_tokenizer = inputs_id_tokenizer, 
+                    text = text,
+                    list_word_original = list_word_original, 
+                    text_token_idx = text_token_idx,
+                    image_token_idx = image_token_idx,
+                    special_token_idx = special_token_idx,
+                    info = None,  # No image info for text-only inputs
+                    confidences = confidences,
+                )
             else:
                 attention = self.get_attention_model(self.model, inputs_id)
                 
@@ -234,6 +235,7 @@ class ModelVisualAttentionExtractor():
                     text_token_idx = text_token_idx,
                     image_token_idx = image_token_idx,
                     special_token_idx = special_token_idx,
+                    info = None,  # No image info for text-only inputs
                 )
                 
            
@@ -384,7 +386,14 @@ class ModelVisualAttentionExtractor():
         # Search subsequence (simple scan)
         
         special_token_idx = self.text_att.compute_special_token_idx(inputs['input_ids'][0], self.text_att.special_tokens_id)
-        image_token_idx = self.text_att.compute_special_token_idx(inputs['input_ids'][0], [self.text_att.vocab[self.text_att.tokenizer.special_tokens_map['image_token']]])
+        
+        # Try to find image tokens, but handle case where they don't exist
+        try:
+            image_token_idx = self.text_att.compute_special_token_idx(inputs['input_ids'][0], [self.text_att.vocab[self.text_att.tokenizer.special_tokens_map['image_token']]])
+        except (KeyError, AttributeError):
+            # No image token found in vocabulary or special tokens map
+            image_token_idx = []
+        
         # image_token_idx, _ = self.find_image_token_positions(inputs)
         text_token_idx = [x for x in range(len(inputs['input_ids'][0])) if x not in special_token_idx]
         special_token_idx = [x for x in special_token_idx if x not in image_token_idx]
@@ -458,8 +467,12 @@ class ModelVisualAttentionExtractor():
                 a_img = a_img / (a_img.sum() + 1e-12)
                 relative_attention_image = a_img
 
-
-                heat  = a_img.reshape(info["grid"][0], info["grid"][1])
+                # Handle grid info for heatmap reshaping
+                if info is not None and "grid" in info:
+                    heat = a_img.reshape(info["grid"][0], info["grid"][1])
+                else:
+                    # Default to 1x1 grid for text-only inputs
+                    heat = a_img.reshape(1, 1)
             else:
                 relative_attention_image = np.zeros(len(image_token_idx))
                 heat = np.zeros((1, 1))
@@ -607,8 +620,14 @@ class ModelVisualAttentionExtractor():
         eps: float = 1e-9,
         skip_first_steps: int = 1        # often skip the first generated step (space/"The")
     ):
-        assert info is not None and "grid" in info, "info['grid']=(gh,gw) is required"
-        gh, gw = info["grid"]; n_patches = gh * gw
+        # Handle text-only case (no image input)
+        if info is None or "grid" not in info:
+            # For text-only inputs, create dummy grid info
+            gh, gw = 1, 1
+            n_patches = 1
+        else:
+            gh, gw = info["grid"]
+            n_patches = gh * gw
 
         prefill = attention[0]
         num_layers = len(prefill)
@@ -616,15 +635,20 @@ class ModelVisualAttentionExtractor():
         N = len(attention) - 1
         T = L + N
 
-        # ---- image keys K: trim to exactly gh*gw patches (drop leading specials; keep spatial) ----
-        K = np.asarray(image_token_idx, dtype=int)
-        if K.size > n_patches:
-            K = K[-n_patches:]
-        assert K.size == n_patches, f"Expected {n_patches} image keys, got {K.size}"
+        # ---- image keys K: handle case where there are no image tokens ----
+        if image_token_idx is not None and len(image_token_idx) > 0:
+            K = np.asarray(image_token_idx, dtype=int)
+            if K.size > n_patches:
+                K = K[-n_patches:]
+            assert K.size == n_patches, f"Expected {n_patches} image keys, got {K.size}"
+        else:
+            # No image tokens - create empty array
+            K = np.array([], dtype=int)
 
         # ---- build an ALLOWED mask over the full length: image patches + real text (no specials) ----
         allowed_full = np.zeros(T, dtype=np.float32)
-        allowed_full[K] = 1.0
+        if len(K) > 0:
+            allowed_full[K] = 1.0
         if text_token_idx is not None:
             allowed_full[np.asarray(text_token_idx, dtype=int)] = 1.0
         if special_token_idx is not None:
@@ -657,16 +681,24 @@ class ModelVisualAttentionExtractor():
             # optional step weight (confidence)
             w = float(confidences[t-1]) if (confidences is not None and t-1 < len(confidences)) else 1.0
 
-            acc_img += w * r_t[K]          # K < S always (image keys are in the prompt)
+            # Only accumulate image attention if there are image tokens
+            if len(K) > 0:
+                acc_img += w * r_t[K]          # K < S always (image keys are in the prompt)
             acc_text_full[:S] += w * r_t
             tot_w += w
 
         if tot_w == 0:
             tot_w = 1.0
 
-        a_img = acc_img / tot_w
-        a_img = a_img / (a_img.sum() + 1e-12)
-        heat  = a_img.reshape(gh, gw)
+        # Handle image attention
+        if len(K) > 0:
+            a_img = acc_img / tot_w
+            a_img = a_img / (a_img.sum() + 1e-12)
+            heat = a_img.reshape(gh, gw)
+        else:
+            # No image tokens - return empty arrays
+            a_img = np.zeros(n_patches, dtype=np.float32)
+            heat = np.zeros((gh, gw), dtype=np.float32)
 
         aggregated_attention_full = acc_text_full / tot_w
         text_aggregated_attention = [
