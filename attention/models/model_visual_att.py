@@ -208,7 +208,7 @@ class ModelVisualAttentionExtractor():
             text_token_idx, image_token_idx, special_token_idx = self.find_token_idx(inputs_id)   
             if attention_method =='rollout':
                 print("Processing trial", trial, "with rollout")
-                attention, confidences = self.get_attention_model_steps(self.model, inputs_id)
+                attention, confidences = self.get_attention_model_steps(self.model, inputs_id, max_new_tokens=1)
                 
                 _, attention_text_trial = self.process_attention_rollout(
                     attention = attention, 
@@ -297,7 +297,7 @@ class ModelVisualAttentionExtractor():
             text_token_idx, image_token_idx, special_token_idx = self.find_token_idx(inputs_id)   
             if attention_method =='rollout':
                 print("Processing trial", trial, "with rollout")
-                attention, confidences = self.get_attention_model_steps(self.model, inputs_id)
+                attention, confidences = self.get_attention_model_steps(self.model, inputs_id, max_new_tokens=1)
                 
                 attention_image_trial, attention_text_trial = self.process_attention_rollout(
                     attention = attention, 
@@ -531,7 +531,7 @@ class ModelVisualAttentionExtractor():
         return output.attentions
 
     @staticmethod
-    def get_attention_model_steps(model, inputs):
+    def get_attention_model_steps(model, inputs, max_new_tokens):
         # check if model has atribute device
         if not hasattr(model, "device"):
             input_ids = inputs["input_ids"]
@@ -545,7 +545,7 @@ class ModelVisualAttentionExtractor():
             output = model.generate(
                 **inputs,
                 do_sample=False,
-                max_new_tokens=200,
+                max_new_tokens=max_new_tokens,
                 return_dict_in_generate=True,
                 output_scores=True,
                 output_attentions=True,

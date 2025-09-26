@@ -450,12 +450,20 @@ class ModelAttentionExtractor:
     @staticmethod
     def load_attention_df(path_folder):
         attention_trials = {}
-        for trial in [d for d in os.listdir(path_folder) if os.path.isdir(os.path.join(path_folder, d)) and 'trial_' in d]:
+        try:
+            files = [d for d in os.listdir(path_folder) if os.path.isdir(os.path.join(path_folder, d)) and 'trial_' in d]
+        except FileNotFoundError:
+            return None
+        for trial in files:
             attention_layer = {}
             for layer in os.listdir(path_folder + "/" + trial):
                 attention = pd.read_csv(
                     path_folder + "/" + trial + "/" + layer, sep=";"
                 )
-                attention_layer[int(layer.split("_")[1].split(".")[0])] = attention
+                try:
+                    layer_name = int(layer.split("_")[1].split(".")[0])
+                except:
+                    layer_name = layer.split("_")[1].split(".")[0]
+                attention_layer[layer_name] = attention
             attention_trials[float(trial.split("_")[1])] = attention_layer
         return attention_trials

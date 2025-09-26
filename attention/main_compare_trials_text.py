@@ -32,21 +32,19 @@ if __name__ == "__main__":
         # -----------------------------------------------
         "llava-hf/llava-1.5-7b-hf": "causalLM",
         "llava-hf/llava-1.5-13b-hf": "causalLM", 
-        "google-bert/bert-base-uncased": "BertBased",
-        "google-bert/bert-large-uncased": "BertBased",
-        # "google-bert/bert-base-cased": "BertBased",
-        "FacebookAI/roberta-base": "BertBased",
-        "FacebookAI/roberta-large": "BertBased",
-        # -----------------------------------------------
-        "mistralai/Mistral-7B-v0.1":"causalLM",
-        "mistralai/Mistral-7B-Instruct-v0.1": "causalLM",
-        "meta-llama/Llama-2-7b-hf": "causalLM",
-        "meta-llama/Llama-2-7b-chat-hf": "causalLM",
-        # -----------------------------------------------
-        "meta-llama/Meta-Llama-3-8B": "causalLM",
-        "meta-llama/Meta-Llama-3-8B-Instruct": "causalLM",
-        # "meta-llama/Llama-3.1-8B": "causalLM",
-        # "meta-llama/Llama-3.1-8B-Instruct": "causalLM",
+        # "google-bert/bert-base-uncased": "BertBased",
+        # "google-bert/bert-large-uncased": "BertBased",
+        # "FacebookAI/roberta-base": "BertBased",
+        # "FacebookAI/roberta-large": "BertBased",
+        # # -----------------------------------------------
+        # "mistralai/Mistral-7B-v0.1":"causalLM",
+        # "mistralai/Mistral-7B-Instruct-v0.1": "causalLM",
+        # "meta-llama/Llama-2-7b-hf": "causalLM",
+        # "meta-llama/Llama-2-7b-chat-hf": "causalLM",
+        # # -----------------------------------------------
+        # "meta-llama/Meta-Llama-3-8B": "causalLM",
+        # "meta-llama/Meta-Llama-3-8B-Instruct": "causalLM",
+
     }
     gaze_features = [
         "fix_duration_n",

@@ -405,7 +405,7 @@ class CompareAttention:
     ):
         filter_cr = folder_filter if folder_filter in['chosen', 'rejected'] else False
         sc_users_all, _ = self.compute_sc_all_userset(
-            gaze_feature=gaze_feature, filter_cr=filter_cr
+            gaze_feature=gaze_feature, filter_cr=filter_cr, folder_attention=folder_attention
         )
         df = pd.DataFrame(sc_users_all).T
         df.rename(columns={df.columns[0]: "mean", df.columns[1]: "std"}, inplace=True)
@@ -556,6 +556,8 @@ class CompareAttention:
         attention_trials = ModelAttentionExtractor.load_attention_df(
             folder_path_attention
         )
+        if attention_trials is None:
+            return None, None
         #read data/raw/trials_info_labels.csv
         trials = list(real_gaze_fixations.keys())
         filter_trials_user = [trial for trial in trials if not float(trial).is_integer()]
